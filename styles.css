@@ -690,9 +690,9 @@ body:not(.play-mode) .squad-panel { display:none !important; }
   display:none;
   align-items:center;
   gap:7px;
-  max-width:190px;
-  min-width:116px;
-  padding:6px 8px;
+  max-width:158px;
+  min-width:104px;
+  padding:5px 6px;
   border:1px solid rgba(105,190,255,.72);
   border-left:3px solid #70baff;
   border-radius:4px;
@@ -705,8 +705,8 @@ body:not(.play-mode) .squad-panel { display:none !important; }
 .mobile-world-marker.visible { display:flex; }
 .mobile-world-marker > div { min-width:0; flex:1; }
 .mobile-world-marker strong,.mobile-world-marker span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.mobile-world-marker strong { color:#9bd7ff; font:800 9px/1.15 Inter,sans-serif; letter-spacing:.07em; }
-.mobile-world-marker span { margin-top:3px; color:rgba(222,243,249,.7); font:700 7px/1.15 Inter,sans-serif; letter-spacing:.05em; }
+.mobile-world-marker strong { color:#9bd7ff; font:800 8px/1.15 Inter,sans-serif; letter-spacing:.06em; }
+.mobile-world-marker span { margin-top:3px; color:rgba(222,243,249,.7); font:700 6px/1.15 Inter,sans-serif; letter-spacing:.04em; }
 .mobile-world-marker.edge::after { content:"▲"; position:absolute; left:50%; bottom:-11px; color:inherit; font-size:9px; transform:translateX(-50%); }
 .mobile-world-marker.action { border-color:#35ff82; border-left-color:#35ff82; box-shadow:0 0 13px rgba(53,255,130,.22),inset 0 0 12px rgba(53,255,130,.08); }
 .mobile-world-marker.action strong { color:#69ffa1; }
@@ -730,6 +730,7 @@ body:not(.play-mode) .squad-panel { display:none !important; }
   pointer-events:auto;
   touch-action:manipulation;
 }
+.mobile-controls .mobile-machine-remove[hidden] { display:none !important; }
 .mobile-controls .mobile-machine-remove:active { transform:scale(.9) !important; background:#ff3048 !important; }
 
 .mobile-joystick {

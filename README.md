@@ -15,7 +15,7 @@ The site includes a custom neon shield favicon for its browser tab and hosted de
 
 ## Mobile controls
 
-- Mobile machine, demolition and recoverable-robot labels are rendered as screen-safe overlays so they remain readable in landscape mode. An occupied machine exposes a projected 42px red `×` touch target; tapping it directly removes that machine's companion without aiming or firing the weapon.
+- Mobile machine, demolition and recoverable-robot labels are rendered as compact screen-safe overlays in landscape mode. Only the nearest relevant machine is shown, while demolition and recovery prompts appear only when useful and visible. An occupied nearby machine exposes a projected 42px red `×` touch target; tapping it directly removes that machine's companion without aiming or firing the weapon.
 
 - Mobile play uses a left-side virtual joystick for movement and right-side dragging for first-person aiming.
 - Hold **FIRE** for automatic shooting. Dedicated **RELOAD**, **USE**, **JUMP**, **ATTACK**, **PROTECT**, and pause buttons remain available during combat.

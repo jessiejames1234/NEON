@@ -2725,7 +2725,8 @@ function placeMobileWorldMarker(element,worldPosition,maxDistance){
   const distance=playerDistanceTo(worldPosition);
   mobileMarkerProjectedPosition.copy(worldPosition).project(camera);
   const inFront=mobileMarkerProjectedPosition.z>=-1&&mobileMarkerProjectedPosition.z<=1;
-  if(!inFront||distance>maxDistance){element.classList.remove("visible","edge");return false;}
+  const insideView=Math.abs(mobileMarkerProjectedPosition.x)<=.94&&mobileMarkerProjectedPosition.y<=.82&&mobileMarkerProjectedPosition.y>=-.78;
+  if(!inFront||!insideView||distance>maxDistance){element.classList.remove("visible","edge");return false;}
   const rawX=(mobileMarkerProjectedPosition.x*.5+.5)*window.innerWidth;
   const rawY=(-mobileMarkerProjectedPosition.y*.5+.5)*window.innerHeight;
   const safeX=THREE.MathUtils.clamp(rawX,92,window.innerWidth-92);
@@ -2744,38 +2745,46 @@ function updateMobileWorldUI(elapsed){
   }
   if(elapsed<mobileWorldUiAt)return;
   mobileWorldUiAt=elapsed+.05;
-  for(const machine of tamingMachines){
-    machine.removeButton.getWorldPosition(mobileMarkerWorldPosition);
-    mobileMarkerWorldPosition.y+=.38;
-    const distance=playerDistanceTo(machine.group.position);
-    const relevant=distance<18||(carriedEnemy&&!machine.processingEnemy&&!machine.tamedEnemy);
-    const visible=relevant&&placeMobileWorldMarker(machine.mobileMarker,mobileMarkerWorldPosition,carriedEnemy?30:18);
-    if(!visible){machine.mobileRemoveButton.hidden=true;continue;}
-    machine.mobileMarker.classList.remove("action","processing","occupied");
-    if(machine.tamedEnemy){
-      machine.mobileMarker.classList.add("occupied");
-      machine.mobileMarkerTitle.textContent=`M${machine.index+1} · ${machine.tamedEnemy.type.name}`;
-      machine.mobileMarkerStatus.textContent=distance<=9?"TAP × TO REMOVE FROM SQUAD":"MOVE CLOSER TO MANAGE";
-      machine.mobileRemoveButton.hidden=distance>9;
-    }else if(machine.processingEnemy){
-      machine.mobileMarker.classList.add("processing");
-      machine.mobileMarkerTitle.textContent=`M${machine.index+1} · PROCESSING`;
-      machine.mobileMarkerStatus.textContent=`TAMING · ${Math.max(0,Math.ceil(machine.readyAt-elapsed))}S`;
-      machine.mobileRemoveButton.hidden=true;
-    }else{
-      machine.mobileMarkerTitle.textContent=`M${machine.index+1} · EMPTY CHAMBER`;
-      machine.mobileMarkerStatus.textContent=carriedEnemy?"TAP USE TO INSTALL ROBOT":"READY FOR RECOVERED ROBOT";
-      machine.mobileMarker.classList.toggle("action",Boolean(carriedEnemy));
-      machine.mobileRemoveButton.hidden=true;
+  for(const machine of tamingMachines){machine.mobileMarker.classList.remove("visible","edge");machine.mobileRemoveButton.hidden=true;}
+  const eligibleMachines=carriedEnemy
+    ? tamingMachines.filter((machine)=>!machine.processingEnemy&&!machine.tamedEnemy)
+    : tamingMachines.filter((machine)=>machine.processingEnemy||machine.tamedEnemy);
+  let relevantMachine=eligibleMachines.sort((a,b)=>playerDistanceTo(a.group.position)-playerDistanceTo(b.group.position))[0]||null;
+  if(!relevantMachine&&!carriedEnemy){
+    const nearestEmpty=[...tamingMachines].sort((a,b)=>playerDistanceTo(a.group.position)-playerDistanceTo(b.group.position))[0];
+    if(nearestEmpty&&playerDistanceTo(nearestEmpty.group.position)<=5.5)relevantMachine=nearestEmpty;
+  }
+  if(relevantMachine){
+    relevantMachine.removeButton.getWorldPosition(mobileMarkerWorldPosition);mobileMarkerWorldPosition.y+=.38;
+    const distance=playerDistanceTo(relevantMachine.group.position);
+    const visible=placeMobileWorldMarker(relevantMachine.mobileMarker,mobileMarkerWorldPosition,carriedEnemy?24:10);
+    if(visible){
+      relevantMachine.mobileMarker.classList.remove("action","processing","occupied");
+      if(relevantMachine.tamedEnemy){
+        relevantMachine.mobileMarker.classList.add("occupied");
+        relevantMachine.mobileMarkerTitle.textContent=`M${relevantMachine.index+1} · ${relevantMachine.tamedEnemy.type.name}`;
+        relevantMachine.mobileMarkerStatus.textContent=distance<=6.5?"TAP × TO REMOVE":"MOVE CLOSER TO MANAGE";
+        relevantMachine.mobileRemoveButton.hidden=distance>6.5;
+      }else if(relevantMachine.processingEnemy){
+        relevantMachine.mobileMarker.classList.add("processing");
+        relevantMachine.mobileMarkerTitle.textContent=`M${relevantMachine.index+1} · PROCESSING`;
+        relevantMachine.mobileMarkerStatus.textContent=`TAMING · ${Math.max(0,Math.ceil(relevantMachine.readyAt-elapsed))}S`;
+      }else{
+        relevantMachine.mobileMarkerTitle.textContent=`M${relevantMachine.index+1} · EMPTY`;
+        relevantMachine.mobileMarkerStatus.textContent=carriedEnemy?"TAP USE TO INSTALL":"ROBOT CHAMBER READY";
+        relevantMachine.mobileMarker.classList.toggle("action",Boolean(carriedEnemy));
+      }
     }
   }
   mobileMarkerWorldPosition.copy(trashStation.group.position);mobileMarkerWorldPosition.y+=4.35;
-  if(placeMobileWorldMarker(mobileTrashMarkerEl,mobileMarkerWorldPosition,carriedEnemy?32:18)){
+  const trashDistance=playerDistanceTo(trashStation.group.position);
+  const showTrash=Boolean(carriedEnemy)||trashDistance<=6.5;
+  if(showTrash&&placeMobileWorldMarker(mobileTrashMarkerEl,mobileMarkerWorldPosition,carriedEnemy?24:6.5)){
     mobileTrashTitleEl.textContent="DEMOLITION STATION";
     mobileTrashStatusEl.textContent=carriedEnemy?(playerDistanceTo(trashStation.group.position)<3.3?"TAP USE TO DEMOLISH":"BRING ROBOT TO RED CHUTE"):"PERMANENT ROBOT REMOVAL";
     mobileTrashMarkerEl.classList.toggle("action",Boolean(carriedEnemy));
-  }
-  let nearestCapture=null,nearestCaptureDistance=24;
+  }else mobileTrashMarkerEl.classList.remove("visible","edge");
+  let nearestCapture=null,nearestCaptureDistance=8;
   if(!carriedEnemy){
     for(const enemy of enemies){
       if(!enemy.capturable)continue;
@@ -2785,7 +2794,7 @@ function updateMobileWorldUI(elapsed){
   }
   if(nearestCapture){
     mobileMarkerWorldPosition.copy(nearestCapture.group.position);mobileMarkerWorldPosition.y+=Math.max(1.5,nearestCapture.type.scale*1.9);
-    if(placeMobileWorldMarker(mobileCaptureMarkerEl,mobileMarkerWorldPosition,24)){
+    if(placeMobileWorldMarker(mobileCaptureMarkerEl,mobileMarkerWorldPosition,8)){
       mobileCaptureTitleEl.textContent=`RECOVER · ${nearestCapture.type.name}`;
       mobileCaptureStatusEl.textContent=nearestCaptureDistance<=2.8?"TAP USE TO PICK UP":`${Math.ceil(nearestCaptureDistance)}M · MOVE CLOSER`;
       mobileCaptureMarkerEl.classList.toggle("action",nearestCaptureDistance<=2.8);
