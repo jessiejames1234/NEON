@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#071019" />
+    <title>Neon Outpost - 50 Wave Survival</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="game" aria-label="3D game viewport"></div>
+
+    <div id="hud" class="hidden" aria-live="polite">
+      <div class="helmet-visor" aria-hidden="true">
+        <div class="helmet-glass"></div>
+        <div class="helmet-rim helmet-rim-top"></div>
+        <div class="helmet-rim helmet-rim-bottom"></div>
+        <div class="helmet-side helmet-side-left"><i></i><i></i><i></i></div>
+        <div class="helmet-side helmet-side-right"><i></i><i></i><i></i></div>
+        <div class="helmet-reflection"></div>
+      </div>
+      <div class="brand">NEON OUTPOST <span>50 WAVE SURVIVAL</span></div>
+      <div id="god-mode-indicator" class="god-indicator hidden">GOD MODE</div>
+      <div class="objective">
+        <span class="objective-label">WAVE</span>
+        <strong><span id="score">0</span>/<span id="total">50</span></strong>
+        <span class="hostiles"><span id="enemy-count">0</span> HOSTILES</span>
+      </div>
+      <div class="health">
+        <div class="health-copy"><span>SUIT INTEGRITY</span><strong id="health-value">100</strong></div>
+        <div class="health-track"><i id="health-fill"></i></div>
+        <div id="regen-status" class="regen-status">AUTO-REPAIR STANDBY</div>
+      </div>
+      <div class="nano-shield" aria-label="Nano Shield">
+        <b id="nano-shield-alert" class="nano-shield-alert" aria-hidden="true"></b>
+        <span>NANO SHIELD</span>
+        <strong><b id="nano-shield-value">500</b><small>/500</small></strong>
+        <div class="nano-shield-track"><i id="nano-shield-fill"></i></div>
+      </div>
+      <div class="ammo">
+        <span class="ammo-label">PULSE RIFLE</span>
+        <strong><span id="ammo">32</span><small>/ INF</small></strong>
+      </div>
+      <div id="crosshair" aria-hidden="true"></div>
+      <div id="ammo-warning" class="ammo-warning hidden" role="alert">MAGAZINE EMPTY <span>PRESS R TO RELOAD</span></div>
+      <div id="status">Prepare for wave 1</div>
+      <div id="speed-lines" aria-hidden="true"></div>
+      <div id="damage-flash" aria-hidden="true"></div>
+      <svg id="nano-shield-impact" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <div id="hud-vignette" aria-hidden="true"></div>
+      <div id="hud-scanlines" aria-hidden="true"></div>
+      <div class="hud-corner top-left" aria-hidden="true"></div>
+      <div class="hud-corner top-right" aria-hidden="true"></div>
+      <div class="hud-corner bottom-left" aria-hidden="true"></div>
+      <div class="hud-corner bottom-right" aria-hidden="true"></div>
+    </div>
+
+    <div id="mobile-controls" class="mobile-controls" aria-label="Mobile game controls">
+      <div id="mobile-look-zone" class="mobile-look-zone" aria-label="Drag to aim"></div>
+      <div id="mobile-joystick" class="mobile-joystick" aria-label="Movement joystick">
+        <div class="mobile-joystick-ring"></div>
+        <div id="mobile-joystick-thumb" class="mobile-joystick-thumb"></div>
+        <span>MOVE</span>
+      </div>
+      <div class="mobile-action-stack">
+        <button id="mobile-reload" class="mobile-action mobile-action-small" type="button">RELOAD</button>
+        <button id="mobile-interact" class="mobile-action mobile-action-small" type="button">USE</button>
+        <button id="mobile-jump" class="mobile-action mobile-action-small" type="button">JUMP</button>
+        <button id="mobile-fire" class="mobile-action mobile-fire" type="button">FIRE</button>
+      </div>
+      <div class="mobile-squad-actions">
+        <button id="mobile-attack" class="active" type="button">ATTACK</button>
+        <button id="mobile-protect" type="button">PROTECT</button>
+      </div>
+      <button id="mobile-pause" class="mobile-pause" type="button" aria-label="Pause game">II</button>
+    </div>
+
+    <div id="rotate-device" class="rotate-device" role="status">
+      <div class="rotate-phone" aria-hidden="true"></div>
+      <strong>ROTATE TO LANDSCAPE</strong>
+      <span>Neon Outpost requires a wider combat view.</span>
+    </div>
+
+    <main id="menu" class="overlay">
+      <section class="panel menu-panel">
+        <div class="menu-layout">
+          <div class="menu-primary">
+        <p class="eyebrow">50-WAVE SURVIVAL PROTOCOL</p>
+        <h1>NEON<br /><span>OUTPOST</span></h1>
+        <p class="intro">
+          Survive 50 escalating enemy waves. Elites arrive every 5 waves, and the Outpost Core waits at wave 50.
+        </p>
+        <button id="play-button" type="button">
+          <span id="play-button-label">ENTER THE OUTPOST</span>
+          <span class="arrow">→</span>
+        </button>
+        <button id="restart-button" class="restart-button hidden" type="button">
+          <span>RESTART FROM WAVE 1</span>
+          <span class="arrow">&#8635;</span>
+        </button>
+        <div class="menu-run-info">
+          <span>MISSION</span><strong>NEON OUTPOST</strong>
+          <span>THREAT</span><strong>50 WAVES</strong>
+          <span>MODE</span><strong>SOLO SURVIVAL</strong>
+        </div>
+        <p class="hint">Press <kbd>ESC</kbd> at any time to pause</p>
+        <p class="mobile-hint">Mobile: left joystick to move, drag the right side to aim, and hold FIRE to shoot. Landscape required.</p>
+          </div>
+          <div class="menu-secondary">
+            <div class="menu-section-heading"><span>CONTROL SCHEMA</span><small>FIELD INPUTS</small></div>
+        <div class="controls-grid">
+          <div><kbd>W A S D</kbd><span>Move</span></div>
+          <div><kbd>MOUSE</kbd><span>Look</span></div>
+          <div><kbd>SPACE</kbd><span>Jump</span></div>
+          <div><kbd>SHIFT</kbd><span>Sprint</span></div>
+          <div><kbd>CLICK</kbd><span>Shoot</span></div>
+          <div><kbd>E</kbd><span>Pick up / place robot</span></div>
+          <div><kbd>1 / 2</kbd><span>Attack / Protect squad</span></div>
+          <div><kbd>R / M</kbd><span>Reload / Music</span></div>
+          <div><kbd>V / - +</kbd><span>Volume toggle / level</span></div>
+        </div>
+        <div class="audio-panel">
+          <div class="audio-heading"><span>MASTER AUDIO</span><small>DEFAULT 100%</small></div>
+          <div class="audio-controls">
+            <button id="volume-button" type="button" aria-pressed="true">
+              <span>VOLUME <strong id="volume-state">ON</strong></span>
+              <b id="volume-percentage">100%</b>
+            </button>
+            <input id="volume-range" type="range" min="0" max="100" step="5" value="100" aria-label="Overall game volume" />
+            <button id="voice-button" class="voice-button" type="button" aria-pressed="false">
+              <span>SQUAD VOICE <strong id="voice-state">OFF</strong></span>
+            </button>
+          </div>
+        </div>
+        <div class="debug-panel">
+          <div class="debug-heading">
+            <span>TESTING CONSOLE</span>
+            <small>PRESS ESC TO ACCESS</small>
+          </div>
+          <div class="debug-controls">
+            <button id="god-mode-button" class="debug-button" type="button" aria-pressed="false">
+              <span>GOD MODE</span>
+              <strong id="god-mode-state">OFF</strong>
+            </button>
+            <label class="wave-picker">
+              <span>WAVE LEVEL</span>
+              <select id="wave-select" aria-label="Select wave level"></select>
+            </label>
+            <button id="change-wave-button" class="debug-button change-wave" type="button">
+              <span>CHANGE WAVE LEVEL</span>
+              <strong>&gt;&gt;</strong>
+            </button>
+          </div>
+        </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside id="squad-panel" class="squad-panel hidden" aria-label="Captured enemy squad">
+      <div class="squad-heading">
+        <span>CAPTURED SQUAD</span>
+        <strong id="squad-count">0/5</strong>
+      </div>
+      <div class="squad-modes" role="group" aria-label="Squad behavior">
+        <button id="squad-attack" class="active" type="button" tabindex="-1">1 · ATTACK</button>
+        <button id="squad-protect" type="button" tabindex="-1">2 · PROTECT</button>
+      </div>
+      <p id="squad-mode-copy">Hunt enemies across the arena, then return.</p>
+      <div id="squad-list" class="squad-list"></div>
+      <small class="squad-manage">REMOVE MEMBERS AT THEIR LINKED MACHINE × BUTTON</small>
+    </aside>
+
+    <div id="complete" class="overlay hidden">
+      <section class="panel complete-panel">
+        <p id="result-label" class="eyebrow">MISSION COMPLETE</p>
+        <h2 id="result-title">OUTPOST<br /><span>RESTORED</span></h2>
+        <p id="result-copy">You survived all 50 waves.</p>
+        <button id="again-button" type="button">PLAY AGAIN <span class="arrow">&#8635;</span></button>
+      </section>
+    </div>
+
+    <div id="error" class="overlay hidden">
+      <section class="panel error-panel">
+        <h2>WEBGL UNAVAILABLE</h2>
+        <p>This game needs a modern browser with hardware acceleration enabled.</p>
+      </section>
+    </div>
+
+    <script type="module" src="./game.js"></script>
+  </body>
+</html>
