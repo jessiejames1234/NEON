@@ -1,5 +1,7 @@
 # Neon Outpost: 50 Wave Survival
 
+The site includes a custom neon shield favicon for its browser tab and hosted deployment.
+
 ## Main and pause menu
 
 - The menu uses a responsive two-column command layout: mission identity, Enter/Resume, Restart, and run information are grouped on the left; controls, audio, and testing tools are grouped on the right. Narrow screens stack the two sections vertically.
