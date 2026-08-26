@@ -111,6 +111,13 @@ const mobileJumpEl = document.querySelector("#mobile-jump");
 const mobileAttackEl = document.querySelector("#mobile-attack");
 const mobileProtectEl = document.querySelector("#mobile-protect");
 const mobilePauseEl = document.querySelector("#mobile-pause");
+const mobileWorldUiEl = document.querySelector("#mobile-world-ui");
+const mobileCaptureMarkerEl = document.querySelector("#mobile-capture-marker");
+const mobileTrashMarkerEl = document.querySelector("#mobile-trash-marker");
+const mobileCaptureTitleEl = mobileCaptureMarkerEl.querySelector("strong");
+const mobileCaptureStatusEl = mobileCaptureMarkerEl.querySelector("span");
+const mobileTrashTitleEl = mobileTrashMarkerEl.querySelector("strong");
+const mobileTrashStatusEl = mobileTrashMarkerEl.querySelector("span");
 const isMobileDevice = navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches;
 const mobileLandscapeQuery = window.matchMedia("(orientation: landscape)");
 document.body.classList.toggle("mobile-device", isMobileDevice);
@@ -460,7 +467,7 @@ for(let slot=0;slot<5;slot+=1){
   const slashA=new THREE.Mesh(new THREE.BoxGeometry(.31,.055,.025),new THREE.MeshBasicMaterial({color:0xff6272}));slashA.position.copy(removeButton.position);slashA.position.z+=.07;slashA.rotation.z=.78;machine.add(slashA);
   const slashB=slashA.clone();slashB.rotation.z=-.78;machine.add(slashB);
   const slotLight=new THREE.Mesh(new THREE.SphereGeometry(.1,8,6),new THREE.MeshBasicMaterial({color:0x43f4d0,transparent:true,opacity:.3}));slotLight.position.set(0,2.5,.3);machine.add(slotLight);
-  const label=createWorldPanel(`TAMING MACHINE ${slot+1}`);label.position.set(0,3.5,.2);label.scale.set(2.7,.5,1);machine.add(label);
+  const label=createWorldPanel(`TAMING MACHINE ${slot+1}`);label.position.set(0,3.5,.2);label.scale.set(2.7,.5,1);label.visible=!isMobileDevice;machine.add(label);
   const carryLabel=createCarryActionLabel(
     isMobileDevice?"TAP USE - INSTALL ROBOT":"PRESS E - INSTALL ROBOT",
     "TAMES AFTER 5 SECONDS",
@@ -468,7 +475,20 @@ for(let slot=0;slot<5;slot+=1){
   );
   carryLabel.position.set(0,4.15,.2);carryLabel.visible=false;machine.add(carryLabel);
   const interactionHighlight=createInteractionHighlight(machine,0x35ff82);
-  const machineData={index:slot,group:machine,glass,glassMaterial,ring,ringMaterial,removeButton,buttonMaterial,slotLight,carryLabel,interactionHighlight,processingEnemy:null,tamedEnemy:null,display:null,storedDisplay:null,readyAt:0};
+  const machineData={index:slot,group:machine,glass,glassMaterial,ring,ringMaterial,removeButton,buttonMaterial,slotLight,carryLabel,interactionHighlight,processingEnemy:null,tamedEnemy:null,display:null,storedDisplay:null,readyAt:0,mobileMarker:null,mobileMarkerTitle:null,mobileMarkerStatus:null,mobileRemoveButton:null};
+  const mobileMarker=document.createElement("div");mobileMarker.className="mobile-world-marker mobile-machine-marker";
+  const mobileCopy=document.createElement("div");
+  const mobileTitle=document.createElement("strong");mobileTitle.textContent=`TAMING MACHINE ${slot+1}`;
+  const mobileStatus=document.createElement("span");mobileStatus.textContent="EMPTY CHAMBER";
+  const mobileRemove=document.createElement("button");mobileRemove.className="mobile-machine-remove";mobileRemove.type="button";mobileRemove.textContent="×";mobileRemove.hidden=true;
+  mobileRemove.setAttribute("aria-label",`Remove robot from taming machine ${slot+1}`);
+  mobileCopy.append(mobileTitle,mobileStatus);mobileMarker.append(mobileCopy,mobileRemove);mobileWorldUiEl.append(mobileMarker);
+  machineData.mobileMarker=mobileMarker;machineData.mobileMarkerTitle=mobileTitle;machineData.mobileMarkerStatus=mobileStatus;machineData.mobileRemoveButton=mobileRemove;
+  mobileRemove.addEventListener("pointerdown",(event)=>{
+    event.preventDefault();event.stopPropagation();firingHeld=false;
+    if(!mobilePlaying||playerDistanceTo(machineData.group.position)>9)return;
+    initAudio();removeMachineCompanion(machineData);
+  });
   removeButton.userData.machine=machineData;tamingMachines.push(machineData);
   obstacles.push({minX:machine.position.x-1.72,maxX:machine.position.x+1.72,minZ:-48.2,maxZ:-46.05,height:3.5});
 }
@@ -537,7 +557,7 @@ for(let slot=0;slot<5;slot+=1){
   const ringMaterial=new THREE.MeshBasicMaterial({color:0xff4057,transparent:true,opacity:.2});
   const ring=new THREE.Mesh(new THREE.RingGeometry(1.85,2.15,32),ringMaterial);ring.rotation.x=-Math.PI/2;ring.position.y=.415;group.add(ring);
   const light=new THREE.Mesh(new THREE.OctahedronGeometry(.15,0),redMat.clone());light.position.set(0,3.35,1.22);group.add(light);
-  const label=createWorldPanel("ROBOT DEMOLITION STATION",0xff4057);label.position.set(0,4.35,.1);label.scale.set(3.65,.62,1);group.add(label);
+  const label=createWorldPanel("ROBOT DEMOLITION STATION",0xff4057);label.position.set(0,4.35,.1);label.scale.set(3.65,.62,1);label.visible=!isMobileDevice;group.add(label);
   const carryLabel=createCarryActionLabel(
     isMobileDevice?"TAP USE - DEMOLISH ROBOT":"PRESS E - DEMOLISH ROBOT",
     "PERMANENTLY DESTROYS UNIT",
@@ -2697,6 +2717,82 @@ function updateCapturePrompt() {
   }
 }
 
+const mobileMarkerWorldPosition=new THREE.Vector3();
+const mobileMarkerProjectedPosition=new THREE.Vector3();
+let mobileWorldUiAt=0;
+
+function placeMobileWorldMarker(element,worldPosition,maxDistance){
+  const distance=playerDistanceTo(worldPosition);
+  mobileMarkerProjectedPosition.copy(worldPosition).project(camera);
+  const inFront=mobileMarkerProjectedPosition.z>=-1&&mobileMarkerProjectedPosition.z<=1;
+  if(!inFront||distance>maxDistance){element.classList.remove("visible","edge");return false;}
+  const rawX=(mobileMarkerProjectedPosition.x*.5+.5)*window.innerWidth;
+  const rawY=(-mobileMarkerProjectedPosition.y*.5+.5)*window.innerHeight;
+  const safeX=THREE.MathUtils.clamp(rawX,92,window.innerWidth-92);
+  const safeY=THREE.MathUtils.clamp(rawY,66,window.innerHeight-94);
+  element.style.left=`${safeX}px`;element.style.top=`${safeY}px`;
+  element.classList.add("visible");
+  element.classList.toggle("edge",Math.abs(rawX-safeX)>2||Math.abs(rawY-safeY)>2);
+  return true;
+}
+
+function updateMobileWorldUI(elapsed){
+  if(!isMobileDevice)return;
+  if(!mobilePlaying||!mobileLandscapeQuery.matches){
+    mobileWorldUiEl.querySelectorAll(".mobile-world-marker.visible").forEach((marker)=>marker.classList.remove("visible"));
+    return;
+  }
+  if(elapsed<mobileWorldUiAt)return;
+  mobileWorldUiAt=elapsed+.05;
+  for(const machine of tamingMachines){
+    machine.removeButton.getWorldPosition(mobileMarkerWorldPosition);
+    mobileMarkerWorldPosition.y+=.38;
+    const distance=playerDistanceTo(machine.group.position);
+    const relevant=distance<18||(carriedEnemy&&!machine.processingEnemy&&!machine.tamedEnemy);
+    const visible=relevant&&placeMobileWorldMarker(machine.mobileMarker,mobileMarkerWorldPosition,carriedEnemy?30:18);
+    if(!visible){machine.mobileRemoveButton.hidden=true;continue;}
+    machine.mobileMarker.classList.remove("action","processing","occupied");
+    if(machine.tamedEnemy){
+      machine.mobileMarker.classList.add("occupied");
+      machine.mobileMarkerTitle.textContent=`M${machine.index+1} · ${machine.tamedEnemy.type.name}`;
+      machine.mobileMarkerStatus.textContent=distance<=9?"TAP × TO REMOVE FROM SQUAD":"MOVE CLOSER TO MANAGE";
+      machine.mobileRemoveButton.hidden=distance>9;
+    }else if(machine.processingEnemy){
+      machine.mobileMarker.classList.add("processing");
+      machine.mobileMarkerTitle.textContent=`M${machine.index+1} · PROCESSING`;
+      machine.mobileMarkerStatus.textContent=`TAMING · ${Math.max(0,Math.ceil(machine.readyAt-elapsed))}S`;
+      machine.mobileRemoveButton.hidden=true;
+    }else{
+      machine.mobileMarkerTitle.textContent=`M${machine.index+1} · EMPTY CHAMBER`;
+      machine.mobileMarkerStatus.textContent=carriedEnemy?"TAP USE TO INSTALL ROBOT":"READY FOR RECOVERED ROBOT";
+      machine.mobileMarker.classList.toggle("action",Boolean(carriedEnemy));
+      machine.mobileRemoveButton.hidden=true;
+    }
+  }
+  mobileMarkerWorldPosition.copy(trashStation.group.position);mobileMarkerWorldPosition.y+=4.35;
+  if(placeMobileWorldMarker(mobileTrashMarkerEl,mobileMarkerWorldPosition,carriedEnemy?32:18)){
+    mobileTrashTitleEl.textContent="DEMOLITION STATION";
+    mobileTrashStatusEl.textContent=carriedEnemy?(playerDistanceTo(trashStation.group.position)<3.3?"TAP USE TO DEMOLISH":"BRING ROBOT TO RED CHUTE"):"PERMANENT ROBOT REMOVAL";
+    mobileTrashMarkerEl.classList.toggle("action",Boolean(carriedEnemy));
+  }
+  let nearestCapture=null,nearestCaptureDistance=24;
+  if(!carriedEnemy){
+    for(const enemy of enemies){
+      if(!enemy.capturable)continue;
+      const distance=playerDistanceTo(enemy.group.position);
+      if(distance<nearestCaptureDistance){nearestCapture=enemy;nearestCaptureDistance=distance;}
+    }
+  }
+  if(nearestCapture){
+    mobileMarkerWorldPosition.copy(nearestCapture.group.position);mobileMarkerWorldPosition.y+=Math.max(1.5,nearestCapture.type.scale*1.9);
+    if(placeMobileWorldMarker(mobileCaptureMarkerEl,mobileMarkerWorldPosition,24)){
+      mobileCaptureTitleEl.textContent=`RECOVER · ${nearestCapture.type.name}`;
+      mobileCaptureStatusEl.textContent=nearestCaptureDistance<=2.8?"TAP USE TO PICK UP":`${Math.ceil(nearestCaptureDistance)}M · MOVE CLOSER`;
+      mobileCaptureMarkerEl.classList.toggle("action",nearestCaptureDistance<=2.8);
+    }
+  }else mobileCaptureMarkerEl.classList.remove("visible");
+}
+
 function removeMachineCompanion(machine){
   if(!machine?.tamedEnemy)return false;
   const name=machine.tamedEnemy.type.name;
@@ -2769,7 +2865,7 @@ function updateTamingMachines(delta,elapsed){
     machine.buttonMaterial.color.setHex(machine.tamedEnemy?0xff3048:0x641b26);
     machine.interactionHighlight.shells.forEach((shell)=>{shell.visible=highlighted;});
     machine.interactionHighlight.material.opacity=.32+Math.sin(elapsed*7+machine.index)*.12;
-    machine.carryLabel.visible=highlighted;
+    machine.carryLabel.visible=highlighted&&!isMobileDevice;
     if(highlighted){machine.carryLabel.material.opacity=.8+Math.sin(elapsed*6+machine.index)*.18;machine.carryLabel.position.y=4.15+Math.sin(elapsed*4+machine.index)*.08;}
     if(highlighted){const pulse=1+Math.sin(elapsed*6+machine.index)*.08;machine.ring.scale.setScalar(pulse);}
     else machine.ring.scale.setScalar(1);
@@ -2790,7 +2886,7 @@ function updateTamingMachines(delta,elapsed){
   trashStation.light.material.opacity=crusherActive ? .95 : .25;
   trashStation.interactionHighlight.shells.forEach((shell)=>{shell.visible=trashHighlighted;});
   trashStation.interactionHighlight.material.opacity=.38+Math.sin(elapsed*8)*.12;
-  trashStation.carryLabel.visible=trashHighlighted;
+  trashStation.carryLabel.visible=trashHighlighted&&!isMobileDevice;
   if(trashHighlighted){trashStation.carryLabel.material.opacity=.8+Math.sin(elapsed*6)*.18;trashStation.carryLabel.position.y=5.08+Math.sin(elapsed*4)*.08;}
   if(trashHighlighted)trashStation.ring.scale.setScalar(1+Math.sin(elapsed*7)*.08);else trashStation.ring.scale.setScalar(1);
   trashStation.crusherDrums.forEach((drum,index)=>{drum.rotation.y+=delta*(crusherActive?7.5:.55)*(index%2===0?1:-1);});
@@ -3685,7 +3781,7 @@ function updateCapturableEnemy(enemy, delta, elapsed) {
     const distance=playerDistanceTo(enemy.group.position);
     enemy.captureLabel.position.copy(enemy.group.position);
     enemy.captureLabel.position.y+=Math.max(1.55,enemy.type.scale*2.05)+Math.sin(elapsed*3+enemy.seed)*.08;
-    enemy.captureLabel.visible=gameplayActive()&&distance<=6.5;
+    enemy.captureLabel.visible=gameplayActive()&&!isMobileDevice&&distance<=6.5;
     enemy.captureLabel.material.opacity=.82+Math.sin(elapsed*4+enemy.seed)*.16;
     if(enemy.captureArrow){
       enemy.captureArrow.position.copy(enemy.group.position);
@@ -4540,6 +4636,7 @@ function animate() {
   updateCarryTutorial(elapsed);
   updateWeapon(delta, elapsed);
   updatePlayerDeathAnimation();
+  updateMobileWorldUI(elapsed);
   updateAmmoWarning();
   updateWaveStatusHud();
   adaptQuality(delta);

@@ -684,6 +684,54 @@ body:not(.play-mode) .squad-panel { display:none !important; }
   touch-action:none;
 }
 
+.mobile-world-ui { position:absolute; inset:0; pointer-events:none; }
+.mobile-world-marker {
+  position:absolute;
+  display:none;
+  align-items:center;
+  gap:7px;
+  max-width:190px;
+  min-width:116px;
+  padding:6px 8px;
+  border:1px solid rgba(105,190,255,.72);
+  border-left:3px solid #70baff;
+  border-radius:4px;
+  color:#dff7ff;
+  background:rgba(3,16,28,.9);
+  box-shadow:0 4px 14px rgba(0,0,0,.42),inset 0 0 13px rgba(61,155,255,.08);
+  transform:translate(-50%,-115%);
+  pointer-events:none;
+}
+.mobile-world-marker.visible { display:flex; }
+.mobile-world-marker > div { min-width:0; flex:1; }
+.mobile-world-marker strong,.mobile-world-marker span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mobile-world-marker strong { color:#9bd7ff; font:800 9px/1.15 Inter,sans-serif; letter-spacing:.07em; }
+.mobile-world-marker span { margin-top:3px; color:rgba(222,243,249,.7); font:700 7px/1.15 Inter,sans-serif; letter-spacing:.05em; }
+.mobile-world-marker.edge::after { content:"▲"; position:absolute; left:50%; bottom:-11px; color:inherit; font-size:9px; transform:translateX(-50%); }
+.mobile-world-marker.action { border-color:#35ff82; border-left-color:#35ff82; box-shadow:0 0 13px rgba(53,255,130,.22),inset 0 0 12px rgba(53,255,130,.08); }
+.mobile-world-marker.action strong { color:#69ffa1; }
+.mobile-machine-marker.processing { border-color:#ffd35c; border-left-color:#ffd35c; }
+.mobile-machine-marker.processing strong { color:#ffe38b; }
+.mobile-machine-marker.occupied { border-color:#4a9fff; border-left-color:#4a9fff; }
+.mobile-trash-marker { border-color:#ff4960; border-left-color:#ff3048; }
+.mobile-trash-marker strong { color:#ff7385; }
+.mobile-capture-marker { border-color:#ffd35c; border-left-color:#ffd35c; }
+.mobile-capture-marker strong { color:#ffe38b; }
+.mobile-controls .mobile-machine-remove {
+  flex:0 0 42px;
+  width:42px;
+  height:42px;
+  border:1px solid #ff6172 !important;
+  border-radius:5px !important;
+  color:#fff !important;
+  background:linear-gradient(145deg,#d92d43,#74101e) !important;
+  box-shadow:0 0 13px rgba(255,48,72,.42) !important;
+  font:900 27px/1 Inter,sans-serif !important;
+  pointer-events:auto;
+  touch-action:manipulation;
+}
+.mobile-controls .mobile-machine-remove:active { transform:scale(.9) !important; background:#ff3048 !important; }
+
 .mobile-joystick {
   position:absolute;
   left:max(25px, env(safe-area-inset-left));
