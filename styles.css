@@ -93,6 +93,9 @@ button, kbd { font: inherit; }
 .menu-panel .debug-panel { margin-top:17px; }
 .restart-button { margin-top:10px; border:1px solid rgba(255,139,61,.5); color:#ffd6bd; background:rgba(255,139,61,.09); }
 .restart-button:hover { color:#160b05; background:var(--orange); box-shadow:0 12px 30px rgba(255,139,61,.18); }
+.showcase-button { width:100%; min-height:48px; display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding:0 20px; border:1px solid rgba(112,186,255,.48); color:#dcedff; background:rgba(78,143,255,.09); text-decoration:none; font:800 14px "Barlow Condensed",sans-serif; letter-spacing:.1em; clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%); transition:transform .18s ease,box-shadow .18s ease,background .18s ease; }
+.showcase-button:hover { transform:translateY(-2px); color:#06111c; background:#70baff; box-shadow:0 12px 28px rgba(78,143,255,.2); }
+.showcase-button .arrow { font-size:20px; }
 .menu-panel #play-button .arrow { font-size:0; }
 .menu-panel #play-button .arrow::after { content:"\2192"; font-size:25px; }
 .menu-run-info { display:grid; grid-template-columns:68px 1fr; gap:7px 12px; margin-top:22px; padding:14px; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.025); }

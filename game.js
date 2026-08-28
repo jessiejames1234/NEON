@@ -1,6 +1,16 @@
 import * as THREE from "three";
 import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import {
+  ENEMY_TYPES, buildEnemyModel, setEnemyModelAnisotropy,
+  unitBoxGeometry, unitSphereGeometry, unitCylinderGeometry, unitConeGeometry,
+  unitTorusGeometry, unitCapsuleGeometry, unitDiamondGeometry,
+  ENEMY_SOUND_PROFILES,emitEnemySoundRecipe,emitScrapBurrowRecipe,
+  ENEMY_DEFINITIONS,getEnemyDefinition,
+} from "./enemy/index.js";
+import {createAbilityVisual,advanceAbilityVisual,disposeAbilityVisual,indicatorColor} from "./enemy/ability-visuals.js";
+import {applyEnemyPose,applyEnemyDeathPose} from "./enemy/animation-runtime.js";
+import {applyEnemySkillPose,applyScrapDigPose,getScrapBurrowPhase} from "./enemy/skill-presentation.js";
 
 const PLAYER = Object.freeze({ eyeHeight: 1.7, radius: 0.36, walk: 5.6, sprint: 9, jump: 7.2, maxHealth: 100 });
 const ARENA_HALF = 23.5;
@@ -133,6 +143,7 @@ try {
 
 let renderScale = Math.min(window.devicePixelRatio, 1);
 renderer.setPixelRatio(renderScale);
+setEnemyModelAnisotropy(renderer.capabilities.getMaxAnisotropy());
 renderer.setSize(window.innerWidth, window.innerHeight);
 // Dynamic shadows multiplied every detailed enemy into another render pass.
 // Baked-looking directional lighting and emissive accents keep the scene readable
@@ -656,29 +667,6 @@ scene.add(new THREE.Points(particlesGeometry, new THREE.PointsMaterial({
   color: 0x8edfd5, size: .045, transparent: true, opacity: .55,
 })));
 
-const ENEMY_TYPES = [
-  null,
-  { name: "Scrap Crawler", health: 55, damage: 5, speed: 2.5, range: 1.2, cooldown: 1.1, color: 0x7e8c82, scale: .65, style: "melee" },
-  { name: "Broken Drone", health: 30, damage: 6, speed: 2.0, range: 10, cooldown: 1.8, color: 0x729c9a, scale: .7, style: "ranged" },
-  { name: "Glow Rat", health: 35, damage: 8, speed: 4.3, range: 1.2, cooldown: 1.4, color: 0x9dbd62, scale: .6, style: "skirmisher" },
-  { name: "Patrol Bot", health: 50, damage: 8, speed: 2.2, range: 11, cooldown: 1.55, color: 0x5b8795, scale: .85, style: "ranged" },
-  { name: "Rust Guard", health: 65, damage: 10, speed: 2.4, range: 1.35, cooldown: 1.0, color: 0x9a6548, scale: .9, style: "melee" },
-  { name: "Pulse Drone", health: 60, damage: 12, speed: 2.8, range: 13, cooldown: .8, color: 0x43f4d0, scale: .78, style: "burst" },
-  { name: "Shock Spider", health: 75, damage: 10, speed: 3.7, range: 1.5, cooldown: 1.25, color: 0x8d6bd1, scale: .72, style: "leaper" },
-  { name: "Riot Unit", health: 110, damage: 12, speed: 1.9, range: 1.5, cooldown: 1.1, color: 0x55717b, scale: 1.05, style: "shield" },
-  { name: "Toxic Walker", health: 120, damage: 8, speed: 1.8, range: 4, cooldown: .75, color: 0x75c64b, scale: 1, style: "toxic" },
-  { name: "Outpost Sniper", health: 80, damage: 25, speed: 1.5, range: 19, cooldown: 2.7, color: 0xe45c5c, scale: .9, style: "sniper" },
-  { name: "Cloaked Hunter", health: 130, damage: 18, speed: 3.2, range: 1.4, cooldown: 1.0, color: 0x7086a8, scale: .88, style: "cloak" },
-  { name: "Repair Engineer", health: 150, damage: 10, speed: 1.8, range: 10, cooldown: 2.0, color: 0xf0bf57, scale: .9, style: "healer" },
-  { name: "Flame Trooper", health: 180, damage: 15, speed: 2.1, range: 5, cooldown: .65, color: 0xff7d3c, scale: 1, style: "flame" },
-  { name: "Phantom Drone", health: 160, damage: 20, speed: 2.6, range: 12, cooldown: 1.6, color: 0xa073ff, scale: .82, style: "teleport" },
-  { name: "Heavy Enforcer", health: 300, damage: 22, speed: 1.55, range: 12, cooldown: .72, color: 0x77888c, scale: 1.25, style: "heavy" },
-  { name: "Plasma Witch", health: 260, damage: 28, speed: 2.2, range: 14, cooldown: 1.7, color: 0xe05cff, scale: 1, style: "homing" },
-  { name: "Siege Walker", health: 450, damage: 35, speed: 1.35, range: 16, cooldown: 2.3, color: 0xb88a53, scale: 1.4, style: "rocket" },
-  { name: "Void Assassin", health: 350, damage: 40, speed: 4.2, range: 1.5, cooldown: 1.4, color: 0x54408d, scale: .95, style: "assassin" },
-  { name: "Titan Guardian", health: 700, damage: 45, speed: 1.2, range: 15, cooldown: 1.8, color: 0xc64d4d, scale: 1.65, style: "titan" },
-  { name: "The Outpost Core", health: 1200, damage: 60, speed: .85, range: 18, cooldown: 1.35, color: 0xff3f68, scale: 2, style: "boss" },
-];
 
 // Each entry is [enemy type, amount]. Low-tier pressure units remain relevant
 // throughout the game while stronger control, support and siege units are added.
@@ -1164,30 +1152,6 @@ function playNanoShieldHitSound(amount){
   }
 }
 
-const ENEMY_SOUND_PROFILES = [
-  null,
-  { base: 92, wave: "square", attack: 1.15, voice: "scrape" },
-  { base: 245, wave: "sine", attack: 1.8, voice: "glitch" },
-  { base: 330, wave: "triangle", attack: 1.35, voice: "squeak" },
-  { base: 185, wave: "square", attack: 1.55, voice: "radio" },
-  { base: 78, wave: "sawtooth", attack: 1.1, voice: "rust" },
-  { base: 290, wave: "square", attack: 2.1, voice: "pulse" },
-  { base: 410, wave: "triangle", attack: 1.6, voice: "shock" },
-  { base: 68, wave: "square", attack: .9, voice: "shield" },
-  { base: 115, wave: "sawtooth", attack: .72, voice: "toxic" },
-  { base: 520, wave: "sawtooth", attack: 2.3, voice: "sniper" },
-  { base: 205, wave: "triangle", attack: 1.25, voice: "cloak" },
-  { base: 360, wave: "sine", attack: 1.45, voice: "repair" },
-  { base: 125, wave: "sawtooth", attack: 1.8, voice: "flame" },
-  { base: 440, wave: "sine", attack: .65, voice: "phantom" },
-  { base: 58, wave: "square", attack: 1.5, voice: "heavy" },
-  { base: 390, wave: "triangle", attack: 1.9, voice: "plasma" },
-  { base: 52, wave: "sawtooth", attack: .8, voice: "siege" },
-  { base: 275, wave: "square", attack: 1.7, voice: "void" },
-  { base: 46, wave: "sawtooth", attack: 1.2, voice: "titan" },
-  { base: 38, wave: "sawtooth", attack: 2.2, voice: "core" },
-];
-
 function enemySpatialTone(enemy, frequency, duration, volume, wave, endRatio = 1, delay = 0) {
   if (!audioContext || !sfxBus) return;
   const now = audioContext.currentTime + delay;
@@ -1342,37 +1306,24 @@ function playEnemySignature(enemy, event, volume) {
 
 function playEnemySound(enemy, event) {
   if (!audioContext || !sfxBus) return;
-  const profile = ENEMY_SOUND_PROFILES[enemy.typeId];
   const distance = enemy.group.position.distanceTo(camera.position);
   const audibility = THREE.MathUtils.clamp(1 / (1 + distance * .055), .18, 1);
   const sizeBoost = enemy.typeId >= 19 ? 1.45 : enemy.elite ? 1.2 : 1;
   const volume = .075 * audibility * sizeBoost;
-  if (event === "step") {
-    enemySpatialTone(enemy, Math.max(32, profile.base * .35), .065, volume * .68, "triangle", .72);
-  } else if (event === "move") {
-    enemySpatialTone(enemy, profile.base * .52, .12, volume * .4, profile.wave, 1.08);
-    if ([2,6,14,16,20].includes(enemy.typeId)) enemySpatialTone(enemy, profile.base * 1.04, .09, volume * .24, "sine", .94, .035);
-  } else if (event === "hurt") {
-    enemySpatialTone(enemy, profile.base * .82, .075, volume * .8, "sawtooth", .58);
-  } else playEnemySignature(enemy, event, volume);
+  emitEnemySoundRecipe(enemy.typeId,event,volume,{
+    tone:(...parameters)=>enemySpatialTone(enemy,...parameters),
+    noise:(...parameters)=>enemyNoise(enemy,...parameters),
+  });
 }
 
 function playScrapBurrowSound(enemy, phase) {
   if (!audioContext || !sfxBus) return;
   const distance = enemy.group.position.distanceTo(camera.position);
   const volume = .085 * THREE.MathUtils.clamp(1 / (1 + distance * .05), .2, 1);
-  if (phase === "enter") {
-    enemySpatialTone(enemy, 145, .48, volume, "sawtooth", .28);
-    enemyNoise(enemy, .42, volume * .95);
-    [0,.15,.3].forEach((delay) => enemySpatialTone(enemy, 76, .08, volume*.75, "square", .55, delay));
-  } else if (phase === "travel") {
-    enemySpatialTone(enemy, 54, .18, volume*.85, "triangle", .78);
-    enemyNoise(enemy, .11, volume*.55);
-  } else {
-    enemySpatialTone(enemy, 48, .58, volume, "sawtooth", 4.2);
-    enemyNoise(enemy, .34, volume);
-    [0,.11,.22].forEach((delay,index) => enemySpatialTone(enemy, 105+index*58, .07, volume*.8, "square", 1.35, delay));
-  }
+  emitScrapBurrowRecipe(phase,volume,{
+    tone:(...parameters)=>enemySpatialTone(enemy,...parameters),
+    noise:(...parameters)=>enemyNoise(enemy,...parameters),
+  });
 }
 
 function createImpact(point) {
@@ -1484,9 +1435,6 @@ function toggleMusic() {
 
 const projectileGeometry = new THREE.SphereGeometry(.11, 7, 5);
 const projectileMaterials = new Map();
-const abilityDiskGeometry = new THREE.CylinderGeometry(.5, .5, .035, 24);
-const abilityOrbGeometry = new THREE.SphereGeometry(.5, 12, 8);
-const abilityBeamGeometry = new THREE.BoxGeometry(1, .07, .16);
 const navDirection = new THREE.Vector3();
 const enemySightRaycaster = new THREE.Raycaster();
 const enemySightOrigin = new THREE.Vector3();
@@ -1686,517 +1634,6 @@ function pickSpawnPoint() {
   return {x:x+(Math.random()-.5)*1.1,z:z+(Math.random()-.5)*1.1,gateIndex:selected.index};
 }
 
-const unitBoxGeometry = new RoundedBoxGeometry(1, 1, 1, 2, .075);
-const unitSphereGeometry = new THREE.SphereGeometry(.5, 10, 7);
-const unitCylinderGeometry = new THREE.CylinderGeometry(.5, .5, 1, 8);
-const unitConeGeometry = new THREE.ConeGeometry(.5, 1, 8);
-const unitTorusGeometry = new THREE.TorusGeometry(.5, .08, 7, 16);
-const unitCapsuleGeometry = new THREE.CapsuleGeometry(.28, .44, 4, 8);
-const unitDiamondGeometry = new THREE.OctahedronGeometry(.5, 1);
-const enemyArmorTextures = new Map();
-
-function getEnemyArmorTexture(typeId, colorValue) {
-  if (enemyArmorTextures.has(typeId)) return enemyArmorTextures.get(typeId);
-  const canvas = document.createElement("canvas");
-  canvas.width = 128;
-  canvas.height = 128;
-  const context = canvas.getContext("2d");
-  const baseColor = new THREE.Color(colorValue);
-  context.fillStyle = baseColor.getStyle();
-  context.fillRect(0, 0, 128, 128);
-  const shade = context.createLinearGradient(0,0,128,128);
-  shade.addColorStop(0, "rgba(255,255,255,.18)");
-  shade.addColorStop(.45, "rgba(255,255,255,0)");
-  shade.addColorStop(1, "rgba(0,0,0,.38)");
-  context.fillStyle = shade;
-  context.fillRect(0,0,128,128);
-
-  let seed = typeId * 92821 + 17;
-  const random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-  const organicSurface = [3,7,11,16,18].includes(typeId);
-  if (organicSurface) {
-    context.strokeStyle = "rgba(210,235,230,.16)";
-    context.lineWidth = 2;
-    for (let vein=0;vein<14;vein+=1) {
-      const x=random()*128, y=random()*128;
-      context.beginPath();
-      context.moveTo(x,y);
-      context.bezierCurveTo(x+random()*28-14,y+random()*35-18,x+random()*38-19,y+random()*40-20,x+random()*48-24,y+random()*52-26);
-      context.stroke();
-    }
-    context.fillStyle = "rgba(5,8,18,.2)";
-    for(let spot=0;spot<22;spot+=1){context.beginPath();context.arc(random()*128,random()*128,1+random()*4,0,Math.PI*2);context.fill();}
-  } else {
-    context.strokeStyle = "rgba(8,16,20,.45)";
-    context.lineWidth = 3;
-    for (let line=16;line<128;line+=32) {
-      context.beginPath(); context.moveTo(line,0); context.lineTo(line,128); context.stroke();
-      context.beginPath(); context.moveTo(0,line); context.lineTo(128,line); context.stroke();
-    }
-    context.strokeStyle = "rgba(255,255,255,.16)";
-    context.lineWidth = 1;
-    for (let line=17;line<128;line+=32) {
-      context.beginPath(); context.moveTo(line,0); context.lineTo(line,128); context.stroke();
-    }
-    context.strokeStyle = "rgba(230,245,240,.24)";
-    for (let scratch=0;scratch<16;scratch+=1) {
-      const x=random()*128, y=random()*128;
-      context.beginPath(); context.moveTo(x,y); context.lineTo(x+(random()-.5)*25,y+(random()-.5)*7); context.stroke();
-    }
-  }
-  if ([8,10,13,15,17,19,20].includes(typeId)) {
-    context.fillStyle = "rgba(255,180,50,.6)";
-    for (let stripe=-128;stripe<256;stripe+=28) {
-      context.beginPath(); context.moveTo(stripe,112); context.lineTo(stripe+12,112); context.lineTo(stripe-4,128); context.lineTo(stripe-16,128); context.fill();
-    }
-  }
-  if (!organicSurface) {
-    context.fillStyle = "rgba(4,10,14,.7)";
-    context.fillRect(7,7,30,11);
-    context.fillStyle = "rgba(210,255,245,.72)";
-    context.font = "bold 8px monospace";
-    context.fillText(`E-${String(typeId).padStart(2,"0")}`,10,15);
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-  enemyArmorTextures.set(typeId, texture);
-  return texture;
-}
-
-function addModelPart(group, geometry, partMaterial, scale, position, rotation = [0,0,0], name = "body") {
-  const mesh = new THREE.Mesh(geometry, partMaterial);
-  mesh.scale.set(...scale);
-  mesh.position.set(...position);
-  mesh.rotation.set(...rotation);
-  mesh.name = name;
-  mesh.castShadow=false;
-  mesh.userData.basePosition = mesh.position.clone();
-  mesh.userData.baseRotation = mesh.rotation.clone();
-  mesh.userData.baseScale = mesh.scale.clone();
-  group.add(mesh);
-  return mesh;
-}
-
-function buildEnemyModel(typeId, type, elite) {
-  const group = new THREE.Group();
-  const cloaked = type.style === "cloak";
-  const makeMaterial = (color, emissive = .08, metalness = .4) => new THREE.MeshStandardMaterial({
-    color, roughness: .58, metalness, emissive: color, emissiveIntensity: emissive,
-    transparent: cloaked, opacity: cloaked ? .42 : 1,
-  });
-  const bodyMaterial = makeMaterial(type.color, .12, .42);
-  bodyMaterial.map = getEnemyArmorTexture(typeId, type.color);
-  const darkMaterial = makeMaterial(0x182126, .02, .65);
-  const accentMaterial = makeMaterial(new THREE.Color(type.color).offsetHSL(.03, .05, .14), .18, .5);
-  const glowMaterial = new THREE.MeshBasicMaterial({ color: elite ? 0xffd35c : type.color, transparent: cloaked, opacity: cloaked ? .5 : 1 });
-  const redGlow = new THREE.MeshBasicMaterial({ color: elite ? 0xffd35c : 0xff496c, transparent: cloaked, opacity: cloaked ? .55 : 1 });
-  const parts = { legs: [], arms: [], rotors: [], weapons: [], rings: [], glows: [], body: null, head: null };
-  const add = (geometry, mat, scale, position, rotation, name) => {
-    const mesh = addModelPart(group, geometry, mat, scale, position, rotation, name);
-    if (mat === glowMaterial || mat === redGlow) parts.glows.push(mesh);
-    return mesh;
-  };
-
-  function humanoid(width = .72, height = 1) {
-    parts.body = add(unitBoxGeometry, bodyMaterial, [width, .75 * height, .42], [0, 1.02 * height, 0], [0,0,0]);
-    add(unitBoxGeometry, darkMaterial, [width * .78, .24 * height, .47], [0, .75 * height, -.01]);
-    add(unitCylinderGeometry, darkMaterial, [.14, .2 * height, .14], [0, 1.49 * height, 0]);
-    parts.head = add(unitBoxGeometry, accentMaterial, [.44, .38, .38], [0, 1.66 * height, 0], [0,0,0], "head");
-    add(unitBoxGeometry, redGlow, [.22, .055, .03], [0, 1.67 * height, .205], [0,0,0], "head");
-    for (const side of [-1, 1]) {
-      const leg = add(unitBoxGeometry, darkMaterial, [.22, .72 * height, .25], [side * .22, .36 * height, 0]);
-      const arm = add(unitBoxGeometry, bodyMaterial, [.2, .72 * height, .22], [side * (width / 2 + .15), 1.03 * height, 0]);
-      parts.legs.push(leg);
-      parts.arms.push(arm);
-      add(unitBoxGeometry, accentMaterial, [.24, .3 * height, .29], [side * .22, .44 * height, .035]);
-      add(unitBoxGeometry, accentMaterial, [.24, .31 * height, .28], [side * (width / 2 + .15), .88 * height, .025]);
-    }
-  }
-
-  switch (typeId) {
-    case 1: { // Scrap Crawler
-      parts.body = add(unitCapsuleGeometry, bodyMaterial, [.72,.72,1.08], [0,.42,-.05], [Math.PI/2,0,0]);
-      parts.head = add(unitBoxGeometry, accentMaterial, [.5,.3,.43], [0,.4,.52], [-.08,0,0], "head");
-      add(unitBoxGeometry, darkMaterial, [.42,.11,.36], [0,.27,.66], [.18,0,0], "head");
-      for (const side of [-1,1]) for (const z of [-.34,0,.34]) {
-        const upper = add(unitCylinderGeometry, darkMaterial, [.075,.52,.075], [side*.47,.25,z], [0,0,side*(.78+Math.abs(z)*.25)]);
-        const lower = add(unitCylinderGeometry, accentMaterial, [.06,.42,.06], [side*.69,.095,z+.04], [0,0,side*.34]);
-        parts.legs.push(upper, lower);
-      }
-      break;
-    }
-    case 2: { // Broken Drone
-      parts.body = add(unitSphereGeometry, bodyMaterial, [1,.72,1], [0,.75,0]);
-      add(unitBoxGeometry, darkMaterial, [.95,.13,.22], [0,.73,0]);
-      add(unitSphereGeometry, redGlow, [.13,.13,.08], [0,.75,.48], [0,0,0], "head");
-      for (const side of [-1,1]) {
-        add(unitBoxGeometry, darkMaterial, [.7,.07,.08], [side*.65,.77,0]);
-        const rotor = add(unitBoxGeometry, accentMaterial, [.62,.025,.08], [side*.98,.82,0]);
-        parts.rotors.push(rotor);
-      }
-      break;
-    }
-    case 3: { // Glow Rat
-      parts.body = add(unitSphereGeometry, bodyMaterial, [1.15,.56,.72], [0,.42,0]);
-      parts.head = add(unitSphereGeometry, accentMaterial, [.55,.5,.6], [0,.48,.52], [0,0,0], "head");
-      for (const side of [-1,1]) add(unitConeGeometry, glowMaterial, [.16,.32,.16], [side*.2,.84,.5], [0,0,side*.12], "head");
-      add(unitCylinderGeometry, accentMaterial, [.06,1.05,.06], [0,.46,-.82], [Math.PI/2,0,0]);
-      for (const side of [-1,1]) for (const z of [-.25,.3]) {
-        const leg = add(unitBoxGeometry, darkMaterial, [.13,.25,.13], [side*.34,.18,z]);
-        parts.legs.push(leg);
-      }
-      break;
-    }
-    case 6: { // Pulse Drone
-      parts.body = add(unitCylinderGeometry, bodyMaterial, [1,.36,1], [0,.76,0]);
-      const ring = add(unitTorusGeometry, glowMaterial, [1.25,1.25,1.25], [0,.76,0], [Math.PI/2,0,0]);
-      parts.rings.push(ring);
-      add(unitSphereGeometry, redGlow, [.14,.14,.12], [0,.76,.54], [0,0,0], "head");
-      for (const side of [-1,1]) {
-        const gunPart = add(unitCylinderGeometry, darkMaterial, [.09,.58,.09], [side*.42,.63,.26], [Math.PI/2,0,0]);
-        parts.weapons.push(gunPart);
-      }
-      break;
-    }
-    case 7: { // Shock Spider
-      parts.body = add(unitSphereGeometry, bodyMaterial, [.9,.55,1], [0,.47,0]);
-      parts.head = add(unitSphereGeometry, accentMaterial, [.55,.42,.5], [0,.48,.53], [0,0,0], "head");
-      for (const side of [-1,1]) for (let row=0; row<4; row+=1) {
-        const leg = add(unitCylinderGeometry, darkMaterial, [.055,.72,.055], [side*(.42+row*.04),.28,.34-row*.22], [0,0,side*(.85+row*.08)]);
-        parts.legs.push(leg);
-      }
-      for (const side of [-1,1]) add(unitSphereGeometry, redGlow, [.07,.07,.06], [side*.12,.54,.76], [0,0,0], "head");
-      break;
-    }
-    case 14: { // Phantom Drone
-      parts.body = add(unitSphereGeometry, bodyMaterial, [.78,.95,.78], [0,.82,0]);
-      add(unitSphereGeometry, glowMaterial, [.3,.5,.3], [0,.82,0]);
-      for (let i=0;i<2;i+=1) {
-        const ring = add(unitTorusGeometry, accentMaterial, [1.25+i*.32,1.25+i*.32,1.25+i*.32], [0,.82,0], [i?Math.PI/2:0,0,i?0:Math.PI/2]);
-        parts.rings.push(ring);
-      }
-      break;
-    }
-    case 16: { // Plasma Witch
-      parts.body = add(unitConeGeometry, bodyMaterial, [1.1,1.55,1.1], [0,.78,0], [0,0,Math.PI]);
-      parts.head = add(unitSphereGeometry, accentMaterial, [.42,.5,.42], [0,1.55,0], [0,0,0], "head");
-      add(unitConeGeometry, darkMaterial, [.62,.8,.62], [0,2.02,0]);
-      const orb = add(unitSphereGeometry, glowMaterial, [.32,.32,.32], [.72,1.15,.08]);
-      parts.weapons.push(orb);
-      for (const side of [-1,1]) parts.arms.push(add(unitCylinderGeometry, bodyMaterial, [.09,.78,.09], [side*.43,1.08,0], [0,0,side*.72]));
-      break;
-    }
-    case 17: { // Siege Walker
-      parts.body = add(unitBoxGeometry, bodyMaterial, [1.25,.62,1.2], [0,.95,0]);
-      parts.head = add(unitBoxGeometry, accentMaterial, [.58,.4,.55], [0,1.35,.28], [0,0,0], "head");
-      for (const side of [-1,1]) for (const z of [-.38,.38]) {
-        const leg = add(unitCylinderGeometry, darkMaterial, [.12,1.05,.12], [side*.55,.45,z], [0,0,side*.32]);
-        parts.legs.push(leg);
-      }
-      for (const side of [-1,1]) {
-        const pod = add(unitBoxGeometry, accentMaterial, [.4,.36,.7], [side*.72,1.22,0]);
-        parts.weapons.push(pod);
-        for (let row=0;row<2;row+=1) add(unitCylinderGeometry, darkMaterial, [.08,.5,.08], [side*.72,1.17+row*.14,.4], [Math.PI/2,0,0]);
-      }
-      break;
-    }
-    case 20: { // Outpost Core
-      parts.body = add(unitSphereGeometry, bodyMaterial, [1.2,1.2,1.2], [0,1.35,0]);
-      add(unitSphereGeometry, glowMaterial, [.55,.55,.55], [0,1.35,0], [0,0,0], "head");
-      for (let i=0;i<3;i+=1) {
-        const ring = add(unitTorusGeometry, i===1?glowMaterial:accentMaterial, [1.55+i*.35,1.55+i*.35,1.55+i*.35], [0,1.35,0], [i===0?Math.PI/2:0,i===2?Math.PI/2:0,i===1?Math.PI/2:0]);
-        parts.rings.push(ring);
-      }
-      for (let i=0;i<4;i+=1) {
-        const angle=i*Math.PI/2;
-        const weapon=add(unitSphereGeometry, accentMaterial, [.28,.28,.28], [Math.cos(angle)*1.2,1.35,Math.sin(angle)*1.2]);
-        parts.weapons.push(weapon);
-      }
-      break;
-    }
-    default: {
-      const width = typeId === 15 ? .94 : typeId === 19 ? 1.08 : typeId === 18 ? .58 : .72;
-      const height = typeId === 19 ? 1.15 : 1;
-      humanoid(width, height);
-      if ([5,8,15,19].includes(typeId)) for (const side of [-1,1]) add(unitBoxGeometry, accentMaterial, [.42,.26,.52], [side*(width/2+.2),1.43*height,0]);
-      if (typeId === 8) {
-        const shield = add(unitBoxGeometry, accentMaterial, [1.02,1.28,.1], [0,.92,.6], [0,0,0], "shield");
-        add(unitBoxGeometry, glowMaterial, [.07,.85,.03], [0,.92,.66]);
-        parts.arms[0].rotation.x = -1.05;
-        parts.arms[0].userData.baseRotation.x = -1.05;
-      }
-      if (typeId === 9) {
-        add(unitCylinderGeometry, makeMaterial(0x75c64b,.45,.2), [.3,.82,.3], [0,1.03,-.42]);
-        add(unitCylinderGeometry, glowMaterial, [.06,.5,.06], [.28,1.05,.34], [Math.PI/2,0,0]);
-      }
-      if (typeId === 10) {
-        const rifle = add(unitCylinderGeometry, darkMaterial, [.075,1.65,.075], [.35,1.05,.5], [Math.PI/2,0,0]);
-        parts.weapons.push(rifle);
-        add(unitCylinderGeometry, redGlow, [.08,.18,.08], [.35,1.14,.15]);
-      }
-      if (typeId === 11 || typeId === 18) for (const side of [-1,1]) {
-        const blade = add(unitBoxGeometry, glowMaterial, [.07,.82,.14], [side*.58,.72,.32], [side*.25,0,side*.08]);
-        parts.weapons.push(blade);
-      }
-      if (typeId === 12) {
-        add(unitBoxGeometry, accentMaterial, [.56,.72,.28], [0,1.05,-.36]);
-        const antenna=add(unitCylinderGeometry, glowMaterial, [.035,.68,.035], [.25,1.72,-.22]);
-        parts.rotors.push(antenna);
-      }
-      if (typeId === 13) {
-        for (const side of [-1,1]) add(unitCylinderGeometry, accentMaterial, [.2,.72,.2], [side*.22,1.05,-.4]);
-        const nozzle=add(unitCylinderGeometry, darkMaterial, [.09,1.0,.09], [.38,.98,.48], [Math.PI/2,0,0]);
-        parts.weapons.push(nozzle);
-      }
-      if (typeId === 15) {
-        const gunBody=add(unitBoxGeometry, darkMaterial, [.46,.36,.9], [.52,1.05,.47]);
-        parts.weapons.push(gunBody);
-        for(let i=0;i<3;i+=1) parts.rotors.push(add(unitCylinderGeometry, accentMaterial, [.055,1.05,.055], [.4+i*.11,1.05,.96], [Math.PI/2,0,0]));
-      }
-      if (typeId === 19) for (const side of [-1,1]) {
-        const cannon=add(unitCylinderGeometry, darkMaterial, [.12,1.0,.12], [side*.72,1.62,.45], [Math.PI/2,0,0]);
-        parts.weapons.push(cannon);
-      }
-      if (typeId === 4) parts.weapons.push(add(unitBoxGeometry, darkMaterial, [.18,.18,.68], [.42,1.02,.42]));
-      if (typeId === 5) add(unitBoxGeometry, accentMaterial, [.62,.25,.48], [0,.45,.02]);
-      break;
-    }
-  }
-
-  // Second-pass silhouette details. These use shared geometry to keep the richer models affordable.
-  const humanoidIds = [4,5,8,9,10,11,12,13,15,18,19];
-  if (humanoidIds.includes(typeId)) {
-    add(unitBoxGeometry, darkMaterial, [.5,.16,.38], [0,.7,0]); // waist
-    add(unitBoxGeometry, accentMaterial, [.5,.38,.055], [0,1.16,.245]); // chest armor
-    add(unitSphereGeometry, glowMaterial, [.09,.09,.045], [0,1.2,.285]); // chest core
-    for (const side of [-1,1]) {
-      add(unitSphereGeometry, darkMaterial, [.15,.15,.15], [side*.22,.69,0]); // hip joint
-      add(unitSphereGeometry, accentMaterial, [.14,.12,.15], [side*.22,.28,.03]); // knee
-      add(unitBoxGeometry, darkMaterial, [.28,.13,.42], [side*.22,.07,.1]); // foot
-      add(unitSphereGeometry, darkMaterial, [.14,.14,.14], [side*.48,1.3,0]); // shoulder joint
-    }
-  }
-
-  if (typeId === 1) {
-    for (let plate=0;plate<3;plate+=1) add(unitBoxGeometry, plate%2?darkMaterial:accentMaterial, [.58,.1,.34], [0,.67,-.34+plate*.3], [0,0,(plate-1)*.04]);
-    for (let leg=0;leg<parts.legs.length;leg+=2) add(unitSphereGeometry, accentMaterial, [.095,.095,.095], parts.legs[leg].position.toArray());
-    for (const side of [-1,1]) add(unitConeGeometry, accentMaterial, [.1,.32,.1], [side*.2,.28,.82], [Math.PI/2,0,side*.22]);
-  } else if (typeId === 2) {
-    add(unitConeGeometry, darkMaterial, [.18,.45,.18], [-.34,1.03,-.12], [0,0,-.38]);
-    add(unitCylinderGeometry, accentMaterial, [.035,.58,.035], [.26,1.12,-.12], [0,0,.22]);
-    add(unitSphereGeometry, redGlow, [.06,.06,.04], [.26,1.43,-.1]);
-  } else if (typeId === 3) {
-    for (const side of [-1,1]) for (const y of [-.05,.05]) {
-      add(unitCylinderGeometry, glowMaterial, [.012,.55,.012], [side*.16,.45+y,.78], [Math.PI/2,0,side*.3]);
-    }
-    add(unitBoxGeometry, darkMaterial, [.13,.13,.08], [0,.35,.82], [0,0,0], "head");
-  } else if (typeId === 4) {
-    add(unitCylinderGeometry, glowMaterial, [.025,.5,.025], [-.24,1.95,-.08]);
-    add(unitBoxGeometry, glowMaterial, [.22,.06,.06], [0,1.88,.03]);
-    add(unitCylinderGeometry, accentMaterial, [.065,.25,.065], [.42,1.08,.76], [Math.PI/2,0,0]);
-  } else if (typeId === 5) {
-    add(unitBoxGeometry, accentMaterial, [.58,.18,.52], [0,1.92,0]);
-    add(unitBoxGeometry, darkMaterial, [.5,.11,.08], [0,1.69,.23], [0,0,0], "head");
-    for (const side of [-1,1]) add(unitBoxGeometry, accentMaterial, [.27,.34,.28], [side*.5,.91,.02]);
-  } else if (typeId === 6) {
-    for (let i=0;i<4;i+=1) {
-      const angle=i*Math.PI/2;
-      add(unitSphereGeometry, glowMaterial, [.1,.1,.1], [Math.sin(angle)*.56,.77,Math.cos(angle)*.56]);
-    }
-    add(unitCylinderGeometry, darkMaterial, [.26,.16,.26], [0,.48,0]);
-  } else if (typeId === 7) {
-    for (const leg of parts.legs) add(unitSphereGeometry, glowMaterial, [.075,.075,.075], leg.position.toArray());
-    const shockRing=add(unitTorusGeometry, glowMaterial, [.72,.72,.72], [0,.55,0], [Math.PI/2,0,0]);
-    parts.rings.push(shockRing);
-  } else if (typeId === 8) {
-    add(unitBoxGeometry, darkMaterial, [1.08,.07,.12], [0,1.57,.61]);
-    add(unitBoxGeometry, darkMaterial, [1.08,.07,.12], [0,.27,.61]);
-    for(const side of [-1,1]) add(unitBoxGeometry, glowMaterial, [.045,1.2,.03], [side*.48,.92,.665]);
-  } else if (typeId === 9) {
-    for(const side of [-1,1]) {
-      add(unitTorusGeometry, glowMaterial, [.3,.3,.3], [side*.22,1.05,-.4], [Math.PI/2,0,0]);
-      add(unitCylinderGeometry, darkMaterial, [.035,.9,.035], [side*.34,1.08,-.18], [.4,0,side*.45]);
-    }
-  } else if (typeId === 10) {
-    add(unitCylinderGeometry, redGlow, [.095,.26,.095], [.35,1.18,.24], [Math.PI/2,0,0]);
-    add(unitBoxGeometry, darkMaterial, [.09,.38,.3], [.35,.95,.62]);
-    add(unitBoxGeometry, accentMaterial, [.62,.08,.38], [0,1.9,-.05]);
-  } else if (typeId === 11) {
-    add(unitConeGeometry, darkMaterial, [.48,.58,.48], [0,2.03,-.08]);
-    add(unitBoxGeometry, glowMaterial, [.26,.035,.035], [0,1.69,.22], [0,0,0], "head");
-    for(const side of [-1,1]) add(unitConeGeometry, accentMaterial, [.12,.38,.12], [side*.48,1.57,-.12], [0,0,side*.72]);
-  } else if (typeId === 12) {
-    add(unitBoxGeometry, darkMaterial, [.42,.42,.12], [0,1.06,-.55]);
-    add(unitSphereGeometry, glowMaterial, [.13,.13,.13], [0,1.06,-.64]);
-    add(unitBoxGeometry, accentMaterial, [.08,.56,.08], [-.47,.82,.37], [0,0,-.45]);
-  } else if (typeId === 13) {
-    add(unitTorusGeometry, darkMaterial, [.38,.38,.38], [0,1.02,-.43], [Math.PI/2,0,0]);
-    add(unitConeGeometry, glowMaterial, [.13,.36,.13], [.38,.98,1.0], [Math.PI/2,0,0]);
-    add(unitBoxGeometry, accentMaterial, [.5,.18,.13], [0,1.48,-.3]);
-  } else if (typeId === 14) {
-    for(let i=0;i<4;i+=1) {
-      const angle=i*Math.PI/2;
-      const crystal=add(unitConeGeometry, glowMaterial, [.14,.42,.14], [Math.sin(angle)*.92,.82,Math.cos(angle)*.92], [0,0,angle]);
-      parts.rotors.push(crystal);
-    }
-  } else if (typeId === 15) {
-    add(unitCylinderGeometry, accentMaterial, [.35,.5,.35], [.54,.98,.05], [Math.PI/2,0,0]);
-    add(unitTorusGeometry, darkMaterial, [.48,.48,.48], [.54,.98,.08], [Math.PI/2,0,0]);
-    add(unitBoxGeometry, accentMaterial, [.68,.22,.42], [0,1.72,-.08]);
-  } else if (typeId === 16) {
-    const staff=add(unitCylinderGeometry, darkMaterial, [.055,1.8,.055], [.72,.88,.08]);
-    parts.weapons.push(staff);
-    add(unitTorusGeometry, glowMaterial, [.43,.43,.43], [.72,1.82,.08]);
-    add(unitSphereGeometry, glowMaterial, [.16,.16,.16], [.72,1.82,.08]);
-  } else if (typeId === 17) {
-    for(const side of [-1,1]) for(const z of [-.38,.38]) add(unitBoxGeometry, darkMaterial, [.36,.12,.4], [side*.72,.04,z]);
-    for(const side of [-1,1]) for(let row=0;row<2;row+=1) add(unitTorusGeometry, glowMaterial, [.1,.1,.1], [side*.72,1.17+row*.14,.64], [Math.PI/2,0,0]);
-  } else if (typeId === 18) {
-    add(unitBoxGeometry, darkMaterial, [.4,.3,.08], [0,1.68,.23], [0,0,0], "head");
-    add(unitSphereGeometry, glowMaterial, [.08,.08,.04], [0,1.7,.29], [0,0,0], "head");
-    for(const side of [-1,1]) add(unitConeGeometry, glowMaterial, [.1,.5,.1], [side*.18,.7,-.22], [0,0,side*.2]);
-  } else if (typeId === 19) {
-    add(unitSphereGeometry, glowMaterial, [.25,.25,.1], [0,1.35,.29]);
-    add(unitTorusGeometry, glowMaterial, [.42,.42,.42], [0,1.35,.3]);
-    for(const side of [-1,1]) add(unitBoxGeometry, accentMaterial, [.36,.42,.28], [side*.28,.3,.03]);
-  } else if (typeId === 20) {
-    for(let i=0;i<8;i+=1) {
-      const angle=i*Math.PI/4;
-      const node=add(unitSphereGeometry, i%2?accentMaterial:glowMaterial, [.13,.13,.13], [Math.sin(angle)*1.65,1.35+Math.sin(angle*2)*.35,Math.cos(angle)*1.65]);
-      parts.rotors.push(node);
-    }
-    add(unitCylinderGeometry, glowMaterial, [.16,2.4,.16], [0,1.35,0]);
-  }
-
-  // High-detail identity pass: bold readable shapes, layered armor and faces for every class.
-  if (humanoidIds.includes(typeId)) {
-    const helmetColor = [10,11,18].includes(typeId) ? darkMaterial : accentMaterial;
-    add(unitBoxGeometry, helmetColor, [.5,.12,.42], [0,1.91,0]);
-    add(unitBoxGeometry, darkMaterial, [.34,.12,.08], [0,1.55,.2], [.18,0,0], "head");
-    for (const side of [-1,1]) {
-      add(unitCylinderGeometry, darkMaterial, [.105,.16,.105], [side*.22,.04,.1], [Math.PI/2,0,0]);
-      add(unitBoxGeometry, accentMaterial, [.18,.3,.045], [side*.22,.4,.15], [-.08,0,0]);
-      add(unitSphereGeometry, darkMaterial, [.13,.13,.13], [side*(typeId===19?.67:.5),1.05,0]);
-      add(unitBoxGeometry, accentMaterial, [.28,.16,.34], [side*(typeId===19?.68:.51),1.37,0], [0,0,side*.12]);
-    }
-    add(unitBoxGeometry, darkMaterial, [.18,.16,.13], [.34,.65,-.24], [0,.2,0]);
-    add(unitBoxGeometry, accentMaterial, [.18,.16,.13], [-.34,.65,-.24], [0,-.2,0]);
-  }
-
-  switch (typeId) {
-    case 1:
-      for (const side of [-1,1]) {
-        add(unitConeGeometry, darkMaterial, [.12,.4,.12], [side*.29,.22,.82], [Math.PI/2,0,side*.22]);
-        add(unitSphereGeometry, redGlow, [.062,.062,.04], [side*.14,.47,.75], [0,0,0], "head");
-        add(unitConeGeometry, darkMaterial, [.07,.2,.07], [side*.47,.72,-.28], [0,0,side*.28]);
-      }
-      add(unitCylinderGeometry, darkMaterial, [.055,.38,.055], [-.25,.77,-.22], [0,0,-.18]);
-      add(unitCylinderGeometry, glowMaterial, [.07,.12,.07], [-.29,.97,-.2]);
-      add(unitBoxGeometry, accentMaterial, [.45,.08,.4], [0,.58,.3], [.12,0,0]);
-      break;
-    case 2:
-      for (const side of [-1,1]) {
-        add(unitTorusGeometry, darkMaterial, [.5,.5,.5], [side*.98,.79,0], [Math.PI/2,0,0]);
-        add(unitCylinderGeometry, glowMaterial, [.07,.22,.07], [side*.66,.58,.28], [Math.PI/2,0,0]);
-      }
-      add(unitBoxGeometry, accentMaterial, [.56,.12,.44], [0,1.04,-.08], [.12,0,0]);
-      break;
-    case 3:
-      add(unitSphereGeometry, glowMaterial, [.18,.1,.08], [0,.42,.82], [0,0,0], "head");
-      for (const side of [-1,1]) {
-        add(unitConeGeometry, darkMaterial, [.08,.24,.08], [side*.18,.22,.72], [Math.PI/2,0,side*.22]);
-        add(unitSphereGeometry, redGlow, [.045,.055,.035], [side*.13,.56,.77], [0,0,0], "head");
-      }
-      break;
-    case 4:
-      add(unitBoxGeometry, accentMaterial, [.55,.18,.5], [0,1.48,-.02], [.08,0,0]);
-      add(unitSphereGeometry, glowMaterial, [.07,.07,.04], [-.16,1.7,.22], [0,0,0], "head");
-      add(unitSphereGeometry, glowMaterial, [.07,.07,.04], [.16,1.7,.22], [0,0,0], "head");
-      break;
-    case 5:
-      add(unitBoxGeometry, darkMaterial, [.66,.32,.5], [0,1.23,-.04], [.1,0,0]);
-      for (const side of [-1,1]) add(unitConeGeometry, accentMaterial, [.13,.34,.13], [side*.46,1.62,-.1], [0,0,side*.55]);
-      break;
-    case 6:
-      add(unitDiamondGeometry, glowMaterial, [.28,.2,.28], [0,.78,.58], [0,0,0], "head");
-      for (const side of [-1,1]) add(unitBoxGeometry, accentMaterial, [.22,.12,.48], [side*.48,.93,-.12], [0,side*.18,0]);
-      break;
-    case 7:
-      add(unitCapsuleGeometry, darkMaterial, [.8,.75,1], [0,.5,-.42], [Math.PI/2,0,0]);
-      for (let i=0;i<3;i+=1) add(unitTorusGeometry, accentMaterial, [.72-i*.12,.72-i*.12,.72-i*.12], [0,.51,-.35-i*.17], [Math.PI/2,0,0]);
-      for (const side of [-1,1]) add(unitConeGeometry, glowMaterial, [.11,.3,.11], [side*.2,.35,.82], [Math.PI/2,0,side*.2]);
-      break;
-    case 8:
-      add(unitBoxGeometry, darkMaterial, [.75,.2,.07], [0,1.3,.69], [0,0,0], "shield");
-      add(unitDiamondGeometry, glowMaterial, [.18,.18,.06], [0,.92,.69], [0,0,0], "shield");
-      break;
-    case 9:
-      add(unitSphereGeometry, glowMaterial, [.2,.2,.2], [0,.98,-.62]);
-      for (const side of [-1,1]) add(unitConeGeometry, glowMaterial, [.09,.32,.09], [side*.28,.85,.61], [Math.PI/2,0,0]);
-      break;
-    case 10:
-      add(unitBoxGeometry, darkMaterial, [.48,.2,.5], [0,1.82,-.08], [-.14,0,0]);
-      add(unitCylinderGeometry, redGlow, [.065,.42,.065], [.35,1.18,.88], [Math.PI/2,0,0]);
-      break;
-    case 11:
-      add(unitCapsuleGeometry, darkMaterial, [.92,1.12,.75], [0,1.05,-.18], [0,0,0]);
-      for (const side of [-1,1]) add(unitDiamondGeometry, glowMaterial, [.12,.28,.08], [side*.54,1.08,.16], [0,0,side*.2]);
-      break;
-    case 12:
-      add(unitTorusGeometry, glowMaterial, [.3,.3,.3], [0,1.08,-.67], [Math.PI/2,0,0]);
-      for (const side of [-1,1]) add(unitBoxGeometry, accentMaterial, [.12,.28,.1], [side*.52,.72,.33], [side*.2,0,side*.2]);
-      break;
-    case 13:
-      for (const side of [-1,1]) add(unitSphereGeometry, glowMaterial, [.12,.12,.12], [side*.22,1.05,-.78]);
-      add(unitConeGeometry, accentMaterial, [.18,.45,.18], [.38,.98,1.15], [Math.PI/2,0,0]);
-      break;
-    case 14:
-      add(unitDiamondGeometry, glowMaterial, [.48,.7,.48], [0,.82,0]);
-      for (let i=0;i<3;i+=1) add(unitConeGeometry, accentMaterial, [.16,.52,.16], [(i-1)*.38,.82,-.48], [Math.PI,0,(i-1)*.16]);
-      break;
-    case 15:
-      add(unitCylinderGeometry, glowMaterial, [.12,.32,.12], [.54,.98,1.18], [Math.PI/2,0,0]);
-      for (const side of [-1,1]) add(unitBoxGeometry, darkMaterial, [.2,.48,.32], [side*.42,1.17,-.32], [0,0,side*.14]);
-      break;
-    case 16:
-      for (const side of [-1,1]) add(unitDiamondGeometry, glowMaterial, [.16,.26,.16], [side*.46,1.5,0]);
-      add(unitTorusGeometry, accentMaterial, [.52,.52,.52], [0,1.55,0], [Math.PI/2,0,0]);
-      break;
-    case 17:
-      add(unitBoxGeometry, darkMaterial, [.62,.18,.5], [0,1.45,.38], [-.12,0,0], "head");
-      add(unitBoxGeometry, redGlow, [.36,.055,.03], [0,1.46,.66], [0,0,0], "head");
-      for (const side of [-1,1]) add(unitConeGeometry, accentMaterial, [.13,.4,.13], [side*.72,1.17,.9], [Math.PI/2,0,0]);
-      break;
-    case 18:
-      for (const side of [-1,1]) {
-        add(unitConeGeometry, darkMaterial, [.18,.55,.18], [side*.48,1.63,-.16], [0,0,side*.65]);
-        add(unitDiamondGeometry, glowMaterial, [.11,.22,.08], [side*.32,1.16,.28]);
-      }
-      break;
-    case 19:
-      add(unitBoxGeometry, darkMaterial, [.9,.28,.58], [0,1.72,-.04], [.08,0,0]);
-      for (const side of [-1,1]) add(unitDiamondGeometry, glowMaterial, [.16,.25,.1], [side*.7,1.62,.13]);
-      add(unitTorusGeometry, accentMaterial, [.55,.55,.55], [0,1.35,.31]);
-      break;
-    case 20:
-      for (let i=0;i<6;i+=1) {
-        const angle=i*Math.PI/3;
-        add(unitConeGeometry, i%2?accentMaterial:darkMaterial, [.22,.85,.22], [Math.sin(angle)*1.05,1.35+Math.cos(angle)*.18,Math.cos(angle)*1.05], [0,0,-angle]);
-      }
-      add(unitDiamondGeometry, redGlow, [.72,.72,.72], [0,1.35,0], [0,0,0], "head");
-      break;
-  }
-
-  if (elite) {
-    const eliteRing = add(unitTorusGeometry, new THREE.MeshBasicMaterial({ color: 0xffd35c }), [1.25,1.25,1.25], [0,2.05,0], [Math.PI/2,0,0]);
-    parts.rings.push(eliteRing);
-  }
-  return { group, bodyMaterial, parts, flying: [2,6,14,16,20].includes(typeId) };
-}
 
 function addHostileTracking(enemy){
   const sourceMeshes=[
@@ -2252,6 +1689,8 @@ function spawnEnemy(typeId, elite = false) {
     steering: new THREE.Vector3(), path: null, pathIndex: 0, pathVersion: -1,
     nextIdleSound: clock.elapsedTime + (typeId === 1 ? .8 + Math.random() : 1.5 + Math.random() * 2.5),
     nextStepSound: clock.elapsedTime + (typeId === 1 ? .08 : Math.random() * .3),
+    animationBaseY: 0, baseScale: group.scale.clone(), deathBaseY: group.position.y,
+    deathBaseRotationY: group.rotation.y, deathDuration: 1.2,
   };
   group.traverse((child) => {
     if (!child.isMesh) return;
@@ -3126,7 +2565,6 @@ function updateEnemyAnimation(enemy, delta, elapsed, movementSpeed) {
   enemy.attackAnimation = THREE.MathUtils.damp(enemy.attackAnimation, 0, 4.5, delta);
   const movementAmount = THREE.MathUtils.clamp(movementSpeed / Math.max(.1, enemy.speed), 0, 1);
   if (movementAmount > .04) enemy.walkPhase += delta * enemy.speed * 4.2;
-  const stride = Math.sin(enemy.walkPhase) * movementAmount;
   const listenerDistance = enemy.group.position.distanceTo(camera.position);
   if (elapsed >= enemy.nextIdleSound && listenerDistance < 34 && elapsed>=nextAmbientEnemySoundAt) {
     playEnemySound(enemy, "idle");
@@ -3141,91 +2579,37 @@ function updateEnemyAnimation(enemy, delta, elapsed, movementSpeed) {
   // Keep gameplay movement at full rate; only distant model-part animation is
   // reduced when the adaptive monitor detects a slow device.
   if(performanceMode&&listenerDistance>16&&(renderFrame+Math.floor(enemy.seed*10))%2===0)return;
-  enemy.parts.legs.forEach((part, index) => {
-    if ([1,3,7,17].includes(enemy.typeId)) {
-      part.rotation.z = part.userData.baseRotation.z + stride * (index % 2 ? .12 : -.12);
-    } else {
-      part.rotation.x = part.userData.baseRotation.x + stride * (index % 2 ? .18 : -.18);
-    }
-  });
-  enemy.parts.arms.forEach((part, index) => {
-    part.rotation.x = part.userData.baseRotation.x + stride * (index % 2 ? -.12 : .12) - enemy.attackAnimation * .5;
-  });
-  enemy.parts.rotors.forEach((part, index) => {
-    part.rotation.y += delta * (index % 2 ? -13 : 13);
-  });
-  enemy.parts.rings.forEach((part, index) => {
-    part.rotation[index % 2 ? "z" : "y"] += delta * (1.5 + index * .7 + enemy.attackAnimation * 8);
-  });
-  enemy.parts.glows.forEach((part, index) => {
-    const pulse = 1 + Math.sin(elapsed * (2.4 + index * .07) + enemy.seed + index) * .045 + enemy.attackAnimation * .08;
-    part.scale.copy(part.userData.baseScale).multiplyScalar(pulse);
-  });
-  enemy.parts.weapons.forEach((part) => {
-    part.position.z = part.userData.basePosition.z - enemy.attackAnimation * .13;
-  });
-  if (enemy.parts.body && !enemy.flying) {
-    enemy.parts.body.position.y = enemy.parts.body.userData.basePosition.y + Math.abs(stride) * .035;
-  }
-  const meleeAttack = enemy.type.range <= 5;
-  const lunge = enemy.attackAnimation * (meleeAttack ? .24 : -.07);
-  if (enemy.parts.body) {
-    enemy.parts.body.position.z = enemy.parts.body.userData.basePosition.z + lunge;
-    enemy.parts.body.rotation.x = enemy.parts.body.userData.baseRotation.x + enemy.attackAnimation * (meleeAttack ? -.16 : .07);
-  }
-  if (enemy.parts.head) {
-    enemy.parts.head.position.z = enemy.parts.head.userData.basePosition.z + lunge * 1.15;
-    enemy.parts.head.rotation.x = enemy.parts.head.userData.baseRotation.x + enemy.attackAnimation * (meleeAttack ? -.2 : .05);
-  }
-  enemy.group.rotation.x = enemy.attackAnimation * (meleeAttack ? -.1 : .045);
-  if (enemy.flying) {
-    enemy.group.position.y = 1.15 + Math.sin(elapsed * 2.4 + enemy.seed) * .25 + enemy.attackAnimation * .1;
-  }
+  applyEnemyPose(enemy,{elapsed,movementAmount,walkPhase:enemy.walkPhase,attackStrength:enemy.attackAnimation});
+  if(enemy.skillAnimation&&elapsed<enemy.skillAnimation.endsAt){
+    applyEnemySkillPose(enemy,getEnemyDefinition(enemy.typeId),elapsed-enemy.skillAnimation.startedAt,enemy.skillAnimation.duration);
+  }else if(enemy.skillAnimation)enemy.skillAnimation=null;
 }
 
 function updateDyingEnemy(enemy, delta) {
-  enemy.deathTime += delta;
-  enemy.group.rotation.z = Math.min(Math.PI * .52, enemy.deathTime * 2.25);
-  enemy.group.rotation.y += delta * (enemy.flying ? 5 : .7);
-  enemy.group.position.y = Math.max(0, enemy.group.position.y - delta * 2.3);
-  if (enemy.deathTime > .55) {
-    const fade = Math.max(0, 1 - (enemy.deathTime - .55) / .65);
-    enemy.group.scale.multiplyScalar(Math.exp(-delta * 2.2));
-    enemy.group.traverse((child) => {
-      if (child.isMesh && child.material) {
-        child.material.transparent = true;
-        child.material.opacity = Math.min(child.material.opacity, fade);
-      }
-    });
+  if(enemy.deathTime===0){
+    enemy.deathBaseY=enemy.group.position.y;
+    enemy.deathBaseRotationY=enemy.group.rotation.y;
+    enemy.baseScale.copy(enemy.group.scale);
+    enemy.group.traverse((child)=>{if(child.isMesh&&child.material)child.userData.baseOpacity=child.material.opacity;});
   }
-  return enemy.deathTime >= 1.2;
+  enemy.deathTime += delta;
+  return applyEnemyDeathPose(enemy,enemy.deathTime);
 }
 
-const ABILITY_COOLDOWNS = [0,7,8,9,8,9,10,8,8,10,9,8,10,9,8,9,10,11,8,10,7];
-const abilityColor = [0,0xd8883b,0x68e7ff,0xb7ff4a,0x43f4d0,0xff7b45,0x37fff2,0xa77cff,0x83e8ff,0x76ff52,0xff334f,0x7b8fff,0xffd35c,0xff6a32,0xb675ff,0xffad46,0xea62ff,0xff9b42,0x7d55ff,0xff4d55,0xff2f68];
+const ABILITY_COOLDOWNS=Object.freeze(ENEMY_DEFINITIONS.map((definition)=>definition?.skill.cooldown||0));
+const abilityColor=Object.freeze(ENEMY_DEFINITIONS.map((definition)=>definition?.skill.color||0));
 const TAMED_ABILITY_COLOR = 0x2587ff;
 
-function combatAbilityColor(enemy){return enemy?.tamed?TAMED_ABILITY_COLOR:abilityColor[enemy.typeId];}
+function combatAbilityColor(enemy){
+  if(enemy?.tamed)return TAMED_ABILITY_COLOR;
+  const definition=enemy?getEnemyDefinition(enemy.typeId):null;
+  return indicatorColor(definition?.skill.indicator,abilityColor[enemy?.typeId]||0xff496c);
+}
 
 function createAbilityEffect(kind, position, options = {}) {
-  const geometry = options.shape === "orb" ? abilityOrbGeometry : options.shape === "beam" ? abilityBeamGeometry : abilityDiskGeometry;
-  const material = new THREE.MeshBasicMaterial({
-    color: options.color ?? 0xff496c,
-    transparent: true,
-    opacity: options.opacity ?? .5,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.copy(position);
-  mesh.position.y = options.shape === "orb" ? (options.y ?? 1) : (options.y ?? .045);
-  const radius = options.radius ?? 2;
-  const visualRadius = options.visualRadius ?? (options.shape === "orb" ? .55 : radius);
-  if (options.shape === "beam") mesh.scale.set(options.length ?? 12, 1, 1);
-  else mesh.scale.set(visualRadius * 2, options.shape === "orb" ? visualRadius * 2 : 1, visualRadius * 2);
-  scene.add(mesh);
+  const visual=createAbilityVisual(scene,kind,position,options),mesh=visual.mesh;
   const effect = {
-    kind, mesh, age: 0, life: options.life ?? 2, radius, damage: options.damage ?? 0,
+    ...visual,damage: options.damage ?? 0,
     owner: options.owner ?? null, target: options.target ?? null, activeAfter: options.activeAfter ?? 0, tickAt: 0,
     hp: options.hp ?? 0, onExpire: options.onExpire ?? null, hitPlayer: false,
   };
@@ -3238,8 +2622,7 @@ function createAbilityEffect(kind, position, options = {}) {
 function removeAbilityEffect(index) {
   const effect = abilityEffects[index];
   if (!effect) return;
-  scene.remove(effect.mesh);
-  effect.mesh.material.dispose();
+  disposeAbilityVisual(scene,effect);
   const hitIndex = abilityHitMeshes.indexOf(effect.mesh);
   if (hitIndex >= 0) abilityHitMeshes.splice(hitIndex, 1);
   abilityEffects.splice(index, 1);
@@ -3308,11 +2691,7 @@ function updateAbilityEffects(delta) {
   for (let i = abilityEffects.length - 1; i >= 0; i -= 1) {
     const effect = abilityEffects[i];
     if (!effect) continue;
-    effect.age += delta;
-    const pulse = 1 + Math.sin(effect.age * 10) * .08;
-    effect.mesh.material.opacity = Math.max(.08, (1 - effect.age / effect.life) * .62);
-    if (effect.kind !== "laser") effect.mesh.rotation.y += delta * 1.8;
-    if (effect.kind === "warning") effect.mesh.scale.y = pulse;
+    advanceAbilityVisual(effect,delta);
     if (effect.kind === "toxic-cloud" || effect.kind === "electric-web" || effect.kind === "flame-wall") {
       if (effect.age >= effect.activeAfter && effect.age >= effect.tickAt && combatTargetDistance(effect.target,effect.mesh.position) <= effect.radius) {
         damageCombatTarget(effect.target,effect.damage,effect.kind.replaceAll("-", " "),effect.owner);
@@ -3399,6 +2778,7 @@ function teleportNearCombatTarget(enemy, target = null, behind = false) {
 
 function activateSignatureAbility(enemy, elapsed, distance, target = null) {
   const id = enemy.typeId;
+  const definition=getEnemyDefinition(id);
   const visualColor=combatAbilityColor(enemy);
   if (id === 1 && distance <= enemy.type.range) {
     // Stay in melee combat instead of disappearing underneath the player.
@@ -3409,9 +2789,10 @@ function activateSignatureAbility(enemy, elapsed, distance, target = null) {
   enemy.abilityAt = id === 1 ? Number.POSITIVE_INFINITY : elapsed + ABILITY_COOLDOWNS[id] + Math.random() * 2;
   enemy.abilityTarget=target;
   statusEl.textContent = `${enemy.type.name}: signature ability`;
+  enemy.skillAnimation={startedAt:elapsed,duration:definition.animations.skillDuration,endsAt:elapsed+definition.animations.skillDuration};
   if (id !== 1) playEnemySound(enemy, "attack");
-  switch (id) {
-    case 1: {
+  switch (definition.skill.handler) {
+    case "scrapBurrow": {
       enemy.burrowState = { startedAt: elapsed, phase: "enter", nextTravelSound: elapsed + 1.15, damaged: false, target };
       enemy.steering.set(0,0,0);
       enemy.burrowMarker = createAbilityEffect("scrap-burrow", enemy.group.position, {
@@ -3421,17 +2802,17 @@ function activateSignatureAbility(enemy, elapsed, distance, target = null) {
       statusEl.textContent = "Scrap Crawler digging down - move away";
       break;
     }
-    case 2: enemy.burstShots = 4; enemy.burstAt = elapsed; enemy.crashAfterBurst = true; break;
-    case 3:
+    case "brokenDroneBarrage": enemy.burstShots = 4; enemy.burstAt = elapsed; enemy.crashAfterBurst = true; break;
+    case "glowRatRush":
       enemies.forEach((ally)=>{if(ally.alive&&ally.tamed===enemy.tamed&&ally.typeId===3&&ally.group.position.distanceTo(enemy.group.position)<9)ally.speedBoostUntil=elapsed+5;});
       enemy.explodesOnDeath = true;
       createAbilityEffect("radiation-pack", enemy.group.position, { color: visualColor, radius: 4, life: 1.2 });
       break;
-    case 4:
+    case "scanningLock":
       telegraphStrike(enemy, combatTargetPosition(target).clone(), 1.1, 1.15, enemy.damage * 1.5, "Scanning Lock",target);
       break;
-    case 5: enemy.chargeUntil = elapsed + 1.5; break;
-    case 6:
+    case "charge": enemy.chargeUntil = elapsed + 1.5; break;
+    case "empPulse":
       createAbilityEffect("emp-pulse", enemy.group.position, { color: visualColor, radius: 7, life: .65 });
       if (distance < 7) {
         if(!target){sprintDisabledUntil=performance.now()+3500;statusEl.textContent="EMP hit - sprint disabled";}
@@ -3439,51 +2820,51 @@ function activateSignatureAbility(enemy, elapsed, distance, target = null) {
         else target.stunnedUntil=elapsed+2;
       }
       break;
-    case 7:
+    case "electricLeap":
       createAbilityEffect("electric-web", combatTargetPosition(target).clone(), { color: visualColor, radius: 2.2, life: 7, damage: 4, hp: 50, target });
       break;
-    case 8:
+    case "shieldBash":
       if (distance < 4) { damageCombatTarget(target,enemy.damage*.8,"Shield Bash",enemy);pushCombatTargetFrom(target,enemy.group.position,2.4); }
       else enemy.chargeUntil = elapsed + 1;
       break;
-    case 9:
+    case "toxicCloud":
       createAbilityEffect("toxic-cloud", enemy.group.position, { color: visualColor, radius: 3.6, life: 7, damage: 4, target });
       break;
-    case 10:
+    case "sniperLaser":
       telegraphStrike(enemy, combatTargetPosition(target).clone(), 1, 1.5, enemy.damage * 2, "Sniper Laser",target);
       break;
-    case 11:
+    case "cloakedStrike":
       teleportNearCombatTarget(enemy,target,true); enemy.cloakUntil=elapsed+1; enemy.pendingStrikeAt=elapsed+.75; break;
-    case 12:
+    case "repairStation":
       createAbilityEffect("repair-station", enemy.group.position, { color: visualColor, shape: "orb", y: .7, radius: 4.5, life: 10, hp: 100, owner: enemy });
       break;
-    case 13: {
+    case "flameWall": {
       const targetPosition=combatTargetPosition(target);
       const dx=targetPosition.x-enemy.group.position.x,dz=targetPosition.z-enemy.group.position.z;
       const length = Math.max(.01, Math.hypot(dx,dz)), px = -dz/length, pz = dx/length;
       for (const offset of [-2.4,0,2.4]) createAbilityEffect("flame-wall",new THREE.Vector3(targetPosition.x+px*offset,0,targetPosition.z+pz*offset),{color:visualColor,radius:1.5,life:5,damage:5,target});
       break;
     }
-    case 14:
+    case "phantomShift":
       for (let i=0;i<3;i+=1) {
         const angle=i*Math.PI*2/3;
         createAbilityEffect("phantom-copy", new THREE.Vector3(enemy.group.position.x+Math.cos(angle)*2,1,enemy.group.position.z+Math.sin(angle)*2), { color: visualColor, shape:"orb", radius:.7, life:5, hp:25 });
       }
       teleportNearCombatTarget(enemy,target);
       break;
-    case 15: enemy.burstShots = 12; enemy.burstAt = elapsed; enemy.stunnedUntil = elapsed + 3; break;
-    case 16:
+    case "minigunBurst": enemy.burstShots = 12; enemy.burstAt = elapsed; enemy.stunnedUntil = elapsed + 3; break;
+    case "gravityOrb":
       createAbilityEffect("gravity-orb", combatTargetPosition(target).clone(), { color: visualColor, shape:"orb", y:1, radius:5, life:5, damage:7, hp:75, target });
       break;
-    case 17:
+    case "bombardment":
       for (let i=0;i<3;i+=1){const p=combatTargetPosition(target);telegraphStrike(enemy,new THREE.Vector3(p.x+(i-1)*2.2,0,p.z+(i%2?.8:-.8)),1.5,1.5+i*.25,enemy.damage,"Siege Bombardment",target);}
       break;
-    case 18:
+    case "voidStrike":
       teleportNearCombatTarget(enemy,target,true);enemy.pendingStrikeAt=elapsed+.45;enemy.cloakUntil=elapsed+.55;break;
-    case 19:
+    case "titanStomp":
       createAbilityEffect("shockwave",enemy.group.position,{color:visualColor,radius:10,life:1.8,damage:enemy.damage,target});
       break;
-    case 20: {
+    case "coreProtocol": {
       const phase = enemy.health / enemy.maxHealth > .67 ? 1 : enemy.health / enemy.maxHealth > .34 ? 2 : 3;
       enemy.coreAbility = (enemy.coreAbility || 0) + 1;
       if (phase === 1) createAbilityEffect("laser",enemy.group.position,{color:visualColor,shape:"beam",y:1.2,length:15,life:5,damage:10,owner:enemy,target});
@@ -3505,26 +2886,17 @@ function removeScrapBurrowMarker(enemy) {
 }
 
 function animateScrapDig(enemy, progress, emerging) {
-  const eased = emerging ? 1 - Math.pow(1-progress, 3) : progress * progress;
-  enemy.group.position.y = emerging ? -.58 + eased * .58 : -eased * .58;
-  enemy.group.rotation.x = (emerging ? 1-progress : progress) * .22;
-  enemy.group.rotation.z = Math.sin(progress * Math.PI * 12) * .055 * (emerging ? 1-progress : 1);
-  enemy.parts.legs.forEach((leg, index) => {
-    const direction = index % 2 ? -1 : 1;
-    leg.rotation.z = leg.userData.baseRotation.z + Math.sin(progress * Math.PI * 8 + index) * .38 * direction;
-    leg.rotation.x = leg.userData.baseRotation.x + Math.sin(progress * Math.PI * 6 + index*.7) * .16;
-  });
-  if (enemy.parts.body) enemy.parts.body.rotation.x = enemy.parts.body.userData.baseRotation.x + (emerging ? -.18 : .24) * Math.sin(progress*Math.PI);
-  if (enemy.parts.head) enemy.parts.head.rotation.x = enemy.parts.head.userData.baseRotation.x + (emerging ? -.28 : .32) * Math.sin(progress*Math.PI);
+  applyScrapDigPose(enemy,progress,emerging);
 }
 
 function updateScrapCrawlerBurrow(enemy, delta, elapsed) {
   const state = enemy.burrowState;
   if (!state) return false;
   const time = elapsed - state.startedAt;
-  if (time < 1) {
-    animateScrapDig(enemy, THREE.MathUtils.clamp(time,0,1), false);
-  } else if (time < 3) {
+  const burrowPhase=getScrapBurrowPhase(time);
+  if (burrowPhase.name === "enter") {
+    animateScrapDig(enemy,burrowPhase.progress,false);
+  } else if (burrowPhase.name === "travel") {
     if (state.phase !== "travel") {
       state.phase = "travel";
       enemy.group.visible = false;
@@ -3544,7 +2916,7 @@ function updateScrapCrawlerBurrow(enemy, delta, elapsed) {
       playScrapBurrowSound(enemy, "travel");
       state.nextTravelSound = elapsed + .34;
     }
-  } else if (time < 4) {
+  } else if (burrowPhase.name === "emerge") {
     if (state.phase !== "emerge") {
       state.phase = "emerge";
       enemy.group.visible = true;
@@ -3555,7 +2927,7 @@ function updateScrapCrawlerBurrow(enemy, delta, elapsed) {
       playScrapBurrowSound(enemy, "emerge");
       statusEl.textContent = "Scrap Crawler emerging - clear the small circle";
     }
-    animateScrapDig(enemy, THREE.MathUtils.clamp(time-3,0,1), true);
+    animateScrapDig(enemy,burrowPhase.progress,true);
   } else {
     enemy.group.visible = true;
     enemy.group.position.y = 0;

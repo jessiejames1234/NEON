@@ -182,7 +182,24 @@ Every enemy has a cooldown-driven signature ability with its own visual effect a
 
 ### Scrap Crawler detail
 
-- The crawler is a low six-legged scrap machine with a capsule chassis, segmented legs, articulated-looking joints, layered salvaged back plates, paired red eyes, jaw plates, mandibles, armor spikes and an exhaust stack.
+- The crawler is a compact six-legged salvage predator with a dark unified chassis, close-fitting rusted flank armor, riveted overlapping back plates, exposed side pistons, dorsal scrap spikes, an asymmetric exhaust stack, rear tow hook, four inset red sensors and short crushing mandibles.
+- Its rebuilt legs use connected hip-to-knee and knee-to-foot segments instead of floating rods. The custom gait recalculates every joint as the feet lift and plant, compresses the exposed pistons, rocks the loose armor, moves both short sensor feelers and drives the entire chassis into each bite.
+
+### Static enemy showroom
+
+- Open `flex.html` to inspect all 20 enemy designs together on a five-by-four display floor with 5.25-meter spacing.
+- The showroom runs no enemy AI, attacks or waves. Move the inspection camera with `W/A/S/D`, rise with `Q`, descend with `E`, drag to rotate, right-drag to pan, or scroll to zoom.
+- Choose **All Enemies** or one enemy from the filter and press **Show**. A single selection hides every other exhibit, moves the chosen enemy to the center of the studio and focuses the camera on it; choosing All Enemies restores the complete three-meter layout.
+- The showroom uses a clean, unboxed studio floor without platforms, glowing rings, grid lines or floating nameplates. Use **Env: Black / Env: White** to switch the background, floor, fog and inspection lighting together.
+- Showroom rendering is optimized independently from gameplay: static model-part transforms are cached, shadow passes are disabled, pixel density is capped and camera events are combined into one render per frame.
+- Selecting one enemy reveals contextual **Idle**, **Walk/Hover**, **Attack**, named signature-skill, **Stunned**, **Death**, and **Reset** preview buttons. Movement skills animate relative to the center anchor and always restore the enemy's exact position and model pose afterward.
+- The training dummy is hidden by default and remains absent for Idle, Walk/Hover, Stunned, Death, Reset, self-buff and repair previews. Attack places it directly inside melee range for close attackers or exactly ten meters away for ranged attackers.
+- Targeted damage, debuff, charge, dash, leap, teleport and burrow skills spawn the dummy at an appropriate test distance. Scrap Crawler always receives a ten-meter Burrow lane, while local effects such as Toxic Cloud and EMP use their shorter effect ranges.
+- Gameplay and showroom signature-skill previews share `enemy/ability-visuals.js`, including the same geometry, scale, opacity, rotation, lifetime and colors. Damage/debuff effects are red, buffs are blue and healing/repair effects are green. During Scrap Burrow the small disk follows the underground crawler exactly as it does in gameplay, then changes to the larger emergence disk. Weapon-only attacks, projectiles, dashes and teleports do not receive an unrelated circle.
+- Gameplay and showroom model poses now also share `enemy/animation-runtime.js` and `enemy/skill-presentation.js`. Idle, locomotion, attack recoil, stunned, death and signature-skill presentation are no longer separately recreated in `game.js` and `flex.js`; the crawler also shares its exact 1-second dig, 2-second travel and 1-second emerge phase clock.
+- Every selected preview repeats the same full cycle: it plays once, immediately restores the enemy, dummy and projectile to their saved starting poses, then plays that animation again. This also applies to Death, Stunned and signature-skill previews.
+- The `enemy/enemies/` directory contains all 20 named enemy JavaScript modules. Each file owns that enemy's stats, model construction, signature sound, animation configuration and signature-skill configuration. `enemy/index.js` validates and combines them into the registry shared by gameplay and the showroom; see `enemy/README.md` for the complete file map.
+- Each named enemy module now contains its complete model construction and unique signature audio recipe. There are no top-level `enemy-models.js` or `enemy-sounds.js` dispatchers. Neutral `enemy/model-utils.js` and `enemy/audio-utils.js` only provide reusable primitives, so gameplay and the showroom build and sound exactly the same enemy definition without duplicating engine plumbing.
 - Scrap Burrow is a timed four-second animation: one second digging at its current position, two seconds visibly tracking underground toward the player, and one second climbing back above ground.
 - Burrow has an exact five-second cooldown after the crawler finishes surfacing. It will not begin burrowing while the player is within its 1.2-unit melee range; it continues biting and waits until the player creates distance.
 - Digging, underground travel and emergence have separate sound sequences. The underground movement repeats a spatial rumble roughly every third of a second.
