@@ -4,6 +4,32 @@ const RESPONSE_HEADERS = {
   "X-Content-Type-Options": "nosniff",
 };
 
+const SESSION_COOKIE = "__Host-neon_session";
+
+function readCookie(request, name) {
+  const match = request.headers.get("Cookie")?.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function authenticatedUser(request, env) {
+  const token = readCookie(request, SESSION_COOKIE);
+  if (!token) return null;
+  return env.LEADERBOARD_DB.prepare(`
+    SELECT users.id, users.username, users.role, users.status
+    FROM sessions
+    JOIN users ON users.id = sessions.user_id
+    WHERE sessions.token_hash = ?1
+      AND sessions.expires_at > ?2
+      AND users.status = 'active'
+    LIMIT 1
+  `).bind(await sha256Hex(token), Math.floor(Date.now() / 1000)).first();
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -29,10 +55,21 @@ export async function onRequestGet({ env }) {
   try {
     const result = await env.LEADERBOARD_DB
       .prepare(`
-        SELECT player_name, score, wave, kills, updated_at
+        SELECT
+          leaderboard.player_name,
+          leaderboard.score,
+          leaderboard.wave,
+          leaderboard.kills,
+          leaderboard.updated_at,
+          COALESCE(users.role, 'player') AS role
         FROM leaderboard
-        ORDER BY score DESC, wave DESC, kills DESC, updated_at ASC
-        LIMIT 20
+        LEFT JOIN users
+          ON users.username = leaderboard.player_name COLLATE NOCASE
+        ORDER BY leaderboard.score DESC,
+                 leaderboard.wave DESC,
+                 leaderboard.kills DESC,
+                 leaderboard.updated_at ASC
+        LIMIT 100
       `)
       .all();
 
@@ -55,16 +92,15 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Invalid JSON request." }, 400);
   }
 
-  const playerName = cleanPlayerName(body.name);
   const score = cleanInteger(body.score, 0, 1_000_000_000);
   const wave = cleanInteger(body.wave, 1, 50);
   const kills = cleanInteger(body.kills, 0, 1_000_000);
 
-  if (playerName.length < 2) {
-    return json({ error: "Name must contain 2 to 18 valid characters." }, 400);
-  }
-
   try {
+    const user = await authenticatedUser(request, env);
+    if (!user) return json({ error: "Login required." }, 401);
+    const authenticatedName = cleanPlayerName(user.username);
+
     await env.LEADERBOARD_DB
       .prepare(`
         INSERT INTO leaderboard
@@ -85,12 +121,12 @@ export async function onRequestPost({ request, env }) {
             ELSE leaderboard.updated_at
           END
       `)
-      .bind(playerName, score, wave, kills)
+      .bind(authenticatedName, score, wave, kills)
       .run();
 
     return json({
       success: true,
-      player: { name: playerName, score, wave, kills },
+      player: { name: authenticatedName, score, wave, kills },
     });
   } catch (error) {
     console.error("Unable to save leaderboard score", error);

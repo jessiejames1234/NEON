@@ -234,6 +234,8 @@ let squadMode = "attack";
 let squadUiAt = 0;
 let godMode = false;
 let currentWave = 0;
+let runPoints = 0;
+let runKills = 0;
 let waveActive = false;
 let spawnQueue = [];
 let spawnCooldown = 0;
@@ -4263,6 +4265,8 @@ function disposeEnemyResources(enemy) {
 
 function killEnemy(enemy) {
   if (!enemy.alive || enemy.tamed) return;
+  runKills += 1;
+  runPoints += Math.round((100 + enemy.typeId * 35 + currentWave * 12) * (enemy.elite ? 2 : 1));
   hideHostileTracking(enemy);
   if (enemy.typeId === 1) {
     enemy.group.visible = true;
@@ -4324,7 +4328,10 @@ function finishGame(won) {
   clearTimeout(nextWaveTimer);
   resultLabelEl.textContent = won ? "MISSION COMPLETE" : "SUIT FAILURE";
   resultTitleEl.innerHTML = won ? "OUTPOST<br><span>RESTORED</span>" : "WAVE<br><span>FAILED</span>";
-  resultCopyEl.textContent = won ? "You survived all 50 waves." : `You reached wave ${currentWave}. Recalibrate and try again.`;
+  resultCopyEl.textContent = won
+    ? `You survived all 50 waves with ${runPoints.toLocaleString()} points.`
+    : `You reached wave ${currentWave} with ${runPoints.toLocaleString()} points. Recalibrate and try again.`;
+  submitRunScore();
   if(!won){
     firingHeld=false;keys.clear();reloading=false;reloadHand.visible=false;
     deathAnimationActive=true;deathAnimationStartedAt=performance.now();deathStartY=camera.position.y;deathStartRotation.copy(camera.rotation);
@@ -4332,6 +4339,27 @@ function finishGame(won) {
     playPlayerDeathSound();
   }
   window.setTimeout(() => mobilePlaying ? leaveMobileGame() : controls.unlock(), won?250:1750);
+}
+
+async function submitRunScore() {
+  if (!window.neonAuth?.user || currentWave < 1 || runPoints < 1) return;
+  try {
+    const response = await fetch("/api/leaderboard", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: window.neonAuth.user.username,
+        score: runPoints,
+        wave: currentWave,
+        kills: runKills,
+      }),
+    });
+    if (!response.ok) throw new Error(`Score submission failed (${response.status}).`);
+    window.dispatchEvent(new CustomEvent("neon-score-submitted"));
+  } catch (error) {
+    console.error("Unable to submit run score", error);
+  }
 }
 
 function updatePlayerDeathAnimation(){
@@ -4405,6 +4433,8 @@ function resetGame() {
   spawnQueue = [];
   waveSelectEl.value = "1";
   currentWave = 0;
+  runPoints = 0;
+  runKills = 0;
   waveActive = false;
   waveStartedAt=0;
   nextWaveAt=0;
@@ -4450,6 +4480,7 @@ function clearCurrentCombat() {
 }
 
 function setGodMode(enabled) {
+  if (enabled && !["admin", "owner"].includes(window.neonAuth?.user?.role)) return;
   godMode = Boolean(enabled);
   godModeButtonEl.classList.toggle("active", godMode);
   godModeButtonEl.setAttribute("aria-pressed", String(godMode));
@@ -4464,6 +4495,7 @@ function setGodMode(enabled) {
 }
 
 function changeWaveLevel() {
+  if (!["admin", "owner"].includes(window.neonAuth?.user?.role)) return;
   const selectedWave = THREE.MathUtils.clamp(Number.parseInt(waveSelectEl.value, 10) || 1, 1, MAX_WAVES);
   initAudio();
   clearCurrentCombat();
@@ -4491,8 +4523,12 @@ for (let waveNumber = 1; waveNumber <= MAX_WAVES; waveNumber += 1) {
   waveSelectEl.append(option);
 }
 waveSelectEl.value = "1";
-godModeButtonEl.addEventListener("click", () => setGodMode(!godMode));
-changeWaveButtonEl.addEventListener("click", changeWaveLevel);
+godModeButtonEl.addEventListener("click", () => {
+  if (["admin", "owner"].includes(window.neonAuth?.user?.role)) setGodMode(!godMode);
+});
+changeWaveButtonEl.addEventListener("click", () => {
+  if (["admin", "owner"].includes(window.neonAuth?.user?.role)) changeWaveLevel();
+});
 volumeButtonEl.addEventListener("click",toggleMasterVolume);
 volumeRangeEl.addEventListener("input",()=>{initAudio();setMasterVolume(Number(volumeRangeEl.value)/100);});
 voiceButtonEl.addEventListener("click",()=>setSquadVoiceEnabled(!squadVoiceEnabled));
@@ -4585,7 +4621,7 @@ window.addEventListener("keydown", (event) => {
   }
   if (event.code === "KeyR") reload();
   if (event.code === "KeyM" && !event.repeat) toggleMusic();
-  if (event.code === "KeyG" && !event.repeat) setGodMode(!godMode);
+  if (event.code === "KeyG" && !event.repeat && ["admin", "owner"].includes(window.neonAuth?.user?.role)) setGodMode(!godMode);
   if (event.code === "KeyE" && !event.repeat) captureNearestEnemy();
   if ((event.code === "Digit1" || event.code === "Numpad1") && !event.repeat) setSquadMode("attack");
   if ((event.code === "Digit2" || event.code === "Numpad2") && !event.repeat) setSquadMode("protect");
@@ -4595,6 +4631,9 @@ window.addEventListener("keydown", (event) => {
 });
 window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", () => {keys.clear();firingHeld=false;});
+window.addEventListener("neon-auth-changed", (event) => {
+  if (!["admin", "owner"].includes(event.detail?.role) && godMode) setGodMode(false);
+});
 window.addEventListener("mousedown", (event) => {
   if(event.button!==0||event.target.closest?.("#squad-panel")||!controls.isLocked)return;
   firingHeld=true;shoot();

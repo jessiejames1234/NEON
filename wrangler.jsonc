@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "neon-outpost-by-jesce",
+  "pages_build_output_dir": ".",
+  "compatibility_date": "2026-08-29",
+  "d1_databases": [
+    {
+      "binding": "LEADERBOARD_DB",
+      "database_name": "neon-outpost-leaderboard",
+      "database_id": "158e3658-2525-4a95-aedc-42b3662f7fe9",
+      "preview_database_id": "LEADERBOARD_DB"
+    }
+  ]
+}

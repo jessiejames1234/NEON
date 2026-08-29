@@ -7,7 +7,8 @@ This folder keeps the source reference, schema, and setup guide for the shared o
 - `schema.sql` creates the D1 leaderboard table and score index.
 - `functions/api/leaderboard.js` is the Cloudflare Pages Function for reading and submitting scores.
 - `users.sql` creates the user account table and unique indexes.
-- `functions/api/register.js` securely registers player accounts.
+- Root `functions/api/register.js` securely registers player accounts.
+- Root `functions/api/login.js`, `session.js`, and `logout.js` provide cookie-based login sessions.
 
 ## 1. Prepare the D1 database
 
@@ -16,6 +17,9 @@ Open the Cloudflare D1 database named `neon-outpost-leaderboard`, select **Conso
 Then paste the contents of `users.sql` and select **Execute** again.
 
 The statements use `IF NOT EXISTS`, so running them again is safe.
+
+If the `users` table already exists, run `users.sql` again now. This adds the
+`sessions` table required by login without deleting existing accounts.
 
 ## 2. Add the Pages binding
 
@@ -128,6 +132,9 @@ Passwords are processed with a unique salt and PBKDF2-SHA256 using Cloudflare Wo
 
 Public registration always creates an `active` account with the `player` role. The endpoint intentionally ignores any requested role or status so users cannot make themselves an administrator or owner.
 
+Passwords must contain at least 7 characters and at least one number. There is
+no uppercase-letter or symbol requirement.
+
 Registration request:
 
 ```http
@@ -148,7 +155,19 @@ $account = @{ username = "TestPlayer"; email = "test@example.com"; password = "T
 Invoke-RestMethod -Method Post -Uri "https://neon-outpost-by-jesce.pages.dev/api/register" -ContentType "application/json" -Body $account
 ```
 
-This creates accounts only. Login sessions, email verification, password reset, and administrator account management still need separate endpoints before authentication is production-ready.
+Registration creates the account and the menu automatically signs in afterward. Email verification, password reset, rate limiting, and full administrator account management remain future work.
+
+Login and logout are now available through `POST /api/login`, `GET /api/session`,
+and `POST /api/logout`. Sessions last seven days and use a Secure, HttpOnly,
+SameSite cookie. Email verification and password reset are still future work.
+
+## Local development
+
+VS Code Live Server cannot execute Cloudflare Pages Functions or access D1.
+Use `npx wrangler pages dev .` to run the static game and `/api/*` Functions
+together. Pages local development uses a separate local D1 database; it does
+not connect directly to production D1. Apply `schema.sql` and `users.sql` to
+that local database before testing login locally.
 
 ## Security note
 
