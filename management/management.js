@@ -12,9 +12,19 @@ const editForm = document.querySelector("#edit-form");
 const editMessage = document.querySelector("#edit-message");
 const userEditFields = document.querySelector("#user-edit-fields");
 const scoreEditFields = document.querySelector("#score-edit-fields");
+const usersPanel = document.querySelector("#users-panel");
+const scoresPanel = document.querySelector("#scores-panel");
+const usersViewButton = document.querySelector("#users-view-button");
+const scoresViewButton = document.querySelector("#scores-view-button");
+const usersFilter = document.querySelector("#users-filter");
+const scoresFilter = document.querySelector("#scores-filter");
+const actionDropdown = document.querySelector("#action-dropdown");
 
 const records = { users: [], scores: [] };
+const tableState = { usersPage: 1, scoresPage: 1, activeView: "users" };
+const PAGE_SIZE = 10;
 let editing = null;
+let activeActionToggle = null;
 
 function setText(selector, value) {
   document.querySelector(selector).textContent = value;
@@ -50,11 +60,60 @@ function emptyRow(columns, message) {
   return row;
 }
 
+function closeActionDropdown() {
+  activeActionToggle?.setAttribute("aria-expanded", "false");
+  activeActionToggle = null;
+  actionDropdown.classList.add("hidden");
+  actionDropdown.replaceChildren();
+}
+
+function dropdownButton(label, className, action, entity, record, status = "") {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.dataset.action = action;
+  button.dataset.entity = entity;
+  button.dataset.id = String(record.id);
+  if (status) button.dataset.status = status;
+  button.textContent = label;
+  button.setAttribute("role", "menuitem");
+  return button;
+}
+
+function openActionDropdown(toggle, entity, record) {
+  if (activeActionToggle === toggle) {
+    closeActionDropdown();
+    return;
+  }
+  closeActionDropdown();
+  activeActionToggle = toggle;
+  toggle.setAttribute("aria-expanded", "true");
+  actionDropdown.append(dropdownButton("EDIT", "action-edit", "edit", entity, record));
+  if (entity === "user") {
+    const activating = record.status === "inactive";
+    actionDropdown.append(dropdownButton(
+      activating ? "SET ACTIVE" : "SET INACTIVE",
+      activating ? "action-activate" : "action-deactivate",
+      "status",
+      entity,
+      record,
+      activating ? "active" : "inactive",
+    ));
+  }
+  actionDropdown.classList.remove("hidden");
+
+  const anchor = toggle.getBoundingClientRect();
+  const menu = actionDropdown.getBoundingClientRect();
+  let top = anchor.bottom + 6;
+  if (top + menu.height > window.innerHeight - 8) top = anchor.top - menu.height - 6;
+  const left = Math.min(window.innerWidth - menu.width - 8, Math.max(8, anchor.right - menu.width));
+  actionDropdown.style.top = `${Math.max(8, top)}px`;
+  actionDropdown.style.left = `${left}px`;
+}
+
 function actionCell(entity, record) {
   const wrapper = document.createElement("div");
   const toggle = document.createElement("button");
-  const actions = document.createElement("div");
-  const edit = document.createElement("button");
   const tableCell = document.createElement("td");
 
   tableCell.className = "action-cell";
@@ -64,56 +123,58 @@ function actionCell(entity, record) {
   toggle.textContent = "\u2022\u2022\u2022";
   toggle.setAttribute("aria-label", `Show actions for ${entity === "user" ? record.username : record.player_name}`);
   toggle.setAttribute("aria-expanded", "false");
-  actions.className = "action-buttons";
-  edit.type = "button";
-  edit.className = "action-edit";
-  edit.dataset.action = "edit";
-  edit.dataset.entity = entity;
-  edit.dataset.id = String(record.id);
-  edit.textContent = "EDIT";
-  actions.append(edit);
-
-  if (entity === "user") {
-    const status = document.createElement("button");
-    const activating = record.status === "inactive";
-    status.type = "button";
-    status.className = activating ? "action-activate" : "action-deactivate";
-    status.dataset.action = "status";
-    status.dataset.entity = entity;
-    status.dataset.id = String(record.id);
-    status.dataset.status = activating ? "active" : "inactive";
-    status.textContent = activating ? "ACTIVE" : "INACTIVE";
-    actions.append(status);
-  }
-
-  toggle.addEventListener("click", () => {
-    const opening = !wrapper.classList.contains("open");
-    document.querySelectorAll(".row-actions.open").forEach((menu) => {
-      menu.classList.remove("open");
-      menu.querySelector(".action-toggle")?.setAttribute("aria-expanded", "false");
-    });
-    wrapper.classList.toggle("open", opening);
-    toggle.setAttribute("aria-expanded", String(opening));
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openActionDropdown(toggle, entity, record);
   });
-  wrapper.append(toggle, actions);
+  wrapper.append(toggle);
   tableCell.append(wrapper);
   return tableCell;
 }
 
-function renderUsers(users) {
+function filteredUsers() {
+  const filter = usersFilter.value.trim().toLowerCase();
+  if (!filter) return records.users;
+  return records.users.filter((user) => [user.username, user.email, user.role, user.status]
+    .some((value) => String(value ?? "").toLowerCase().includes(filter)));
+}
+
+function filteredScores() {
+  const filter = scoresFilter.value.trim().toLowerCase();
+  if (!filter) return records.scores;
+  return records.scores.filter((score) => [score.player_name, score.role, score.score, score.wave, score.kills]
+    .some((value) => String(value ?? "").toLowerCase().includes(filter)));
+}
+
+function updatePagination(entity, totalRecords, totalPages, currentPage) {
+  const prefix = entity === "users" ? "users" : "scores";
+  setText(`#${prefix}-page`, `PAGE ${currentPage} / ${totalPages}`);
+  setText(`#${prefix}-count`, `${totalRecords} RECORD${totalRecords === 1 ? "" : "S"}`);
+  document.querySelector(`#${prefix}-previous`).disabled = currentPage <= 1;
+  document.querySelector(`#${prefix}-next`).disabled = currentPage >= totalPages;
+}
+
+function renderUsers() {
+  closeActionDropdown();
+  const users = filteredUsers();
+  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
+  tableState.usersPage = Math.min(tableState.usersPage, totalPages);
+  const start = (tableState.usersPage - 1) * PAGE_SIZE;
+  const pageUsers = users.slice(start, start + PAGE_SIZE);
   usersTable.replaceChildren();
-  if (!users.length) {
+  updatePagination("users", users.length, totalPages, tableState.usersPage);
+  if (!pageUsers.length) {
     usersTable.append(emptyRow(7, "NO USER RECORDS FOUND"));
     return;
   }
-  users.forEach((user) => {
+  pageUsers.forEach((user, index) => {
     const row = document.createElement("tr");
     const roleCell = document.createElement("td");
     const statusCell = document.createElement("td");
     roleCell.append(badge(user.role, "role"));
     statusCell.append(badge(user.status, "status"));
     row.append(
-      cell(String(user.id), "numeric"),
+      cell(String(start + index + 1), "rank numeric"),
       cell(user.username, "username"),
       cell(user.email),
       roleCell,
@@ -125,18 +186,25 @@ function renderUsers(users) {
   });
 }
 
-function renderScores(scores) {
+function renderScores() {
+  closeActionDropdown();
+  const scores = filteredScores();
+  const totalPages = Math.max(1, Math.ceil(scores.length / PAGE_SIZE));
+  tableState.scoresPage = Math.min(tableState.scoresPage, totalPages);
+  const start = (tableState.scoresPage - 1) * PAGE_SIZE;
+  const pageScores = scores.slice(start, start + PAGE_SIZE);
   scoresTable.replaceChildren();
-  if (!scores.length) {
+  updatePagination("scores", scores.length, totalPages, tableState.scoresPage);
+  if (!pageScores.length) {
     scoresTable.append(emptyRow(8, "NO COMBAT SCORES RECORDED"));
     return;
   }
-  scores.forEach((score, index) => {
+  pageScores.forEach((score, index) => {
     const row = document.createElement("tr");
     const roleCell = document.createElement("td");
     roleCell.append(badge(score.role, "role"));
     row.append(
-      cell(String(index + 1).padStart(2, "0"), "rank numeric"),
+      cell(String(start + index + 1).padStart(2, "0"), "rank numeric"),
       cell(score.player_name, "username"),
       roleCell,
       cell(Number(score.score || 0).toLocaleString(), "points numeric"),
@@ -162,10 +230,8 @@ function renderOverview(payload) {
   setText("#active-users", activeUsers.toLocaleString());
   setText("#staff-users", staffUsers.toLocaleString());
   setText("#total-scores", scores.length.toLocaleString());
-  setText("#users-count", `${users.length} RECORD${users.length === 1 ? "" : "S"}`);
-  setText("#scores-count", `${scores.length} RECORD${scores.length === 1 ? "" : "S"}`);
-  renderUsers(users);
-  renderScores(scores);
+  renderUsers();
+  renderScores();
 }
 
 async function requestJson(url) {
@@ -215,6 +281,7 @@ function closeEditModal() {
 }
 
 function openEditModal(entity, id) {
+  closeActionDropdown();
   const source = entity === "user" ? records.users : records.scores;
   const record = source.find((item) => Number(item.id) === Number(id));
   if (!record) return;
@@ -222,6 +289,12 @@ function openEditModal(entity, id) {
   editMessage.textContent = "";
   userEditFields.classList.toggle("hidden", entity !== "user");
   scoreEditFields.classList.toggle("hidden", entity !== "score");
+  userEditFields.querySelectorAll("input, select").forEach((field) => {
+    field.disabled = entity !== "user";
+  });
+  scoreEditFields.querySelectorAll("input, select").forEach((field) => {
+    field.disabled = entity !== "score";
+  });
 
   if (entity === "user") {
     editModalTitle.textContent = `EDIT USER // ${record.username}`;
@@ -240,9 +313,7 @@ function openEditModal(entity, id) {
   (entity === "user" ? document.querySelector("#edit-username") : document.querySelector("#edit-points"))?.focus();
 }
 
-async function handleTableAction(event) {
-  const button = event.target.closest("button[data-action]");
-  if (!button) return;
+async function handleActionButton(button) {
   const id = Number(button.dataset.id);
   if (button.dataset.action === "edit") {
     openEditModal(button.dataset.entity, id);
@@ -260,6 +331,20 @@ async function handleTableAction(event) {
       button.disabled = false;
     }
   }
+}
+
+function switchManagementView(view) {
+  const showingUsers = view === "users";
+  tableState.activeView = showingUsers ? "users" : "scores";
+  setText("#management-view-title", showingUsers ? "USER" : "SCORE");
+  usersPanel.classList.toggle("hidden", !showingUsers);
+  scoresPanel.classList.toggle("hidden", showingUsers);
+  usersViewButton.classList.toggle("active", showingUsers);
+  scoresViewButton.classList.toggle("active", !showingUsers);
+  usersViewButton.setAttribute("aria-selected", String(showingUsers));
+  scoresViewButton.setAttribute("aria-selected", String(!showingUsers));
+  closeActionDropdown();
+  (showingUsers ? usersFilter : scoresFilter).focus();
 }
 
 async function loadManagement() {
@@ -289,8 +374,41 @@ async function loadManagement() {
 }
 
 refreshButton.addEventListener("click", loadManagement);
-usersTable.addEventListener("click", handleTableAction);
-scoresTable.addEventListener("click", handleTableAction);
+usersViewButton.addEventListener("click", () => switchManagementView("users"));
+scoresViewButton.addEventListener("click", () => switchManagementView("scores"));
+usersFilter.addEventListener("input", () => {
+  tableState.usersPage = 1;
+  renderUsers();
+});
+scoresFilter.addEventListener("input", () => {
+  tableState.scoresPage = 1;
+  renderScores();
+});
+document.querySelector("#users-previous").addEventListener("click", () => {
+  tableState.usersPage = Math.max(1, tableState.usersPage - 1);
+  renderUsers();
+});
+document.querySelector("#users-next").addEventListener("click", () => {
+  tableState.usersPage += 1;
+  renderUsers();
+});
+document.querySelector("#scores-previous").addEventListener("click", () => {
+  tableState.scoresPage = Math.max(1, tableState.scoresPage - 1);
+  renderScores();
+});
+document.querySelector("#scores-next").addEventListener("click", () => {
+  tableState.scoresPage += 1;
+  renderScores();
+});
+actionDropdown.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (button) handleActionButton(button);
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest("#action-dropdown,.action-toggle")) closeActionDropdown();
+});
+window.addEventListener("resize", closeActionDropdown);
+window.addEventListener("scroll", closeActionDropdown, true);
 document.querySelector("#close-edit-modal").addEventListener("click", closeEditModal);
 document.querySelector("#cancel-edit").addEventListener("click", closeEditModal);
 editModal.addEventListener("click", (event) => {

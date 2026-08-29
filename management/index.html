@@ -26,7 +26,7 @@
         <header class="management-header">
           <div>
             <p>NEON OUTPOST // SECURE OPERATIONS</p>
-            <h1>USER <span>MANAGEMENT</span></h1>
+            <h1><strong id="management-view-title">USER</strong> <span>MANAGEMENT</span></h1>
             <small>Authenticated owner: <strong id="owner-name">---</strong></small>
           </div>
           <nav>
@@ -44,23 +44,39 @@
 
         <p id="management-message" class="management-message" role="status" aria-live="polite"></p>
 
-        <section class="data-panel">
+        <div class="management-switch" role="tablist" aria-label="Management view">
+          <button id="users-view-button" class="active" type="button" role="tab" aria-selected="true" aria-controls="users-panel">USER MANAGEMENT</button>
+          <button id="scores-view-button" type="button" role="tab" aria-selected="false" aria-controls="scores-panel">SCORE MANAGEMENT</button>
+        </div>
+
+        <section id="users-panel" class="data-panel" role="tabpanel" aria-labelledby="users-view-button">
           <div class="panel-heading">
             <div><span>IDENTITY DATABASE</span><h2>REGISTERED USERS</h2></div>
-            <b id="users-count">0 RECORDS</b>
+            <div class="panel-tools">
+              <label><span>FILTER USERS</span><input id="users-filter" type="search" placeholder="Username, email, role, status..." autocomplete="off" /></label>
+              <b id="users-count">0 RECORDS</b>
+            </div>
           </div>
           <div class="table-scroll">
             <table>
-              <thead><tr><th>ID</th><th>USERNAME</th><th>EMAIL</th><th>ROLE</th><th>STATUS</th><th>CREATED</th><th class="action-heading">ACTION</th></tr></thead>
+              <thead><tr><th>#</th><th>USERNAME</th><th>EMAIL</th><th>ROLE</th><th>STATUS</th><th>CREATED</th><th class="action-heading">ACTION</th></tr></thead>
               <tbody id="users-table"></tbody>
             </table>
           </div>
+          <footer class="table-pagination">
+            <button id="users-previous" type="button" aria-label="Previous users page">&#8592;</button>
+            <span id="users-page">PAGE 1 / 1</span>
+            <button id="users-next" type="button" aria-label="Next users page">&#8594;</button>
+          </footer>
         </section>
 
-        <section class="data-panel score-panel">
+        <section id="scores-panel" class="data-panel score-panel hidden" role="tabpanel" aria-labelledby="scores-view-button">
           <div class="panel-heading">
             <div><span>COMBAT PERFORMANCE</span><h2>PLAYER SCORES</h2></div>
-            <b id="scores-count">0 RECORDS</b>
+            <div class="panel-tools">
+              <label><span>FILTER SCORES</span><input id="scores-filter" type="search" placeholder="Operative, role, points, wave..." autocomplete="off" /></label>
+              <b id="scores-count">0 RECORDS</b>
+            </div>
           </div>
           <div class="table-scroll">
             <table>
@@ -68,9 +84,16 @@
               <tbody id="scores-table"></tbody>
             </table>
           </div>
+          <footer class="table-pagination">
+            <button id="scores-previous" type="button" aria-label="Previous scores page">&#8592;</button>
+            <span id="scores-page">PAGE 1 / 1</span>
+            <button id="scores-next" type="button" aria-label="Next scores page">&#8594;</button>
+          </footer>
         </section>
       </div>
     </main>
+
+    <div id="action-dropdown" class="action-dropdown hidden" role="menu"></div>
 
     <div id="edit-modal" class="edit-modal hidden" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
       <section class="edit-dialog">
