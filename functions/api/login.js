@@ -1,5 +1,5 @@
 const PBKDF2_HASH_BYTES = 32;
-const SESSION_SECONDS = 60 * 60 * 24 * 7;
+const SESSION_SECONDS = 60 * 60 * 12;
 const SESSION_COOKIE = "__Host-neon_session";
 
 const JSON_HEADERS = {
@@ -84,7 +84,10 @@ export async function onRequestPost({ request, env }) {
     const token = toBase64(crypto.getRandomValues(new Uint8Array(32)))
       .replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
     const now = Math.floor(Date.now() / 1000);
-    await env.LEADERBOARD_DB.prepare("DELETE FROM sessions WHERE expires_at <= ?1").bind(now).run();
+    await env.LEADERBOARD_DB.prepare(`
+      DELETE FROM sessions
+      WHERE expires_at <= ?1 OR created_at <= datetime('now', '-12 hours')
+    `).bind(now).run();
     await env.LEADERBOARD_DB.prepare(`
       INSERT INTO sessions (token_hash, user_id, expires_at, created_at, last_seen_at)
       VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -92,9 +95,15 @@ export async function onRequestPost({ request, env }) {
 
     return json({
       success: true,
-      user: { id: user.id, username: user.username, email: user.email, role: user.role },
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        sessionExpiresAt: now + SESSION_SECONDS,
+      },
     }, 200, {
-      "Set-Cookie": `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_SECONDS}`,
+      "Set-Cookie": `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_SECONDS}; Priority=High`,
     });
   } catch (error) {
     console.error("Unable to log in", error);

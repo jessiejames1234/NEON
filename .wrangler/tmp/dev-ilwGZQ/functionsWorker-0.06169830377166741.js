@@ -964,6 +964,7 @@ async function getOwner(request, env2) {
     JOIN users ON users.id = sessions.user_id
     WHERE sessions.token_hash = ?1
       AND sessions.expires_at > ?2
+      AND sessions.created_at > datetime('now', '-12 hours')
       AND users.status = 'active'
       AND users.role = 'owner'
     LIMIT 1
@@ -1166,6 +1167,7 @@ async function authenticatedUser(request, env2) {
     JOIN users ON users.id = sessions.user_id
     WHERE sessions.token_hash = ?1
       AND sessions.expires_at > ?2
+      AND sessions.created_at > datetime('now', '-12 hours')
       AND users.status = 'active'
     LIMIT 1
   `).bind(await sha256Hex2(token), Math.floor(Date.now() / 1e3)).first();
@@ -1278,7 +1280,7 @@ function onRequestOptions2() {
 __name(onRequestOptions2, "onRequestOptions2");
 __name2(onRequestOptions2, "onRequestOptions");
 var PBKDF2_HASH_BYTES = 32;
-var SESSION_SECONDS = 60 * 60 * 24 * 7;
+var SESSION_SECONDS = 60 * 60 * 12;
 var SESSION_COOKIE3 = "__Host-neon_session";
 var JSON_HEADERS2 = {
   "Cache-Control": "no-store",
@@ -1361,16 +1363,25 @@ async function onRequestPost2({ request, env: env2 }) {
     }
     const token = toBase64(crypto.getRandomValues(new Uint8Array(32))).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
     const now = Math.floor(Date.now() / 1e3);
-    await env2.LEADERBOARD_DB.prepare("DELETE FROM sessions WHERE expires_at <= ?1").bind(now).run();
+    await env2.LEADERBOARD_DB.prepare(`
+      DELETE FROM sessions
+      WHERE expires_at <= ?1 OR created_at <= datetime('now', '-12 hours')
+    `).bind(now).run();
     await env2.LEADERBOARD_DB.prepare(`
       INSERT INTO sessions (token_hash, user_id, expires_at, created_at, last_seen_at)
       VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `).bind(await sha256Hex3(token), user.id, now + SESSION_SECONDS).run();
     return json3({
       success: true,
-      user: { id: user.id, username: user.username, email: user.email, role: user.role }
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        sessionExpiresAt: now + SESSION_SECONDS
+      }
     }, 200, {
-      "Set-Cookie": `${SESSION_COOKIE3}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_SECONDS}`
+      "Set-Cookie": `${SESSION_COOKIE3}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_SECONDS}; Priority=High`
     });
   } catch (error3) {
     console.error("Unable to log in", error3);
@@ -1577,9 +1588,19 @@ function json5(data, status = 200) {
 }
 __name(json5, "json5");
 __name2(json5, "json");
+function expiredCookie() {
+  return `${SESSION_COOKIE5}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
+}
+__name(expiredCookie, "expiredCookie");
+__name2(expiredCookie, "expiredCookie");
 function readCookie4(request, name) {
   const match2 = request.headers.get("Cookie")?.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
-  return match2 ? decodeURIComponent(match2[1]) : "";
+  if (!match2) return "";
+  try {
+    return decodeURIComponent(match2[1]);
+  } catch {
+    return "";
+  }
 }
 __name(readCookie4, "readCookie4");
 __name2(readCookie4, "readCookie");
@@ -1595,19 +1616,39 @@ async function onRequestGet5({ request, env: env2 }) {
   try {
     const tokenHash = await sha256Hex5(token);
     const user = await env2.LEADERBOARD_DB.prepare(`
-      SELECT users.id, users.username, users.email, users.role, users.status
+      SELECT users.id, users.username, users.email, users.role, users.status,
+             MIN(
+               sessions.expires_at,
+               CAST(strftime('%s', sessions.created_at, '+12 hours') AS INTEGER)
+             ) AS session_expires_at
       FROM sessions
       JOIN users ON users.id = sessions.user_id
-      WHERE sessions.token_hash = ?1 AND sessions.expires_at > ?2
+      WHERE sessions.token_hash = ?1
+        AND sessions.expires_at > ?2
+        AND sessions.created_at > datetime('now', '-12 hours')
+        AND users.status = 'active'
+        AND users.role IN ('player', 'admin', 'owner')
       LIMIT 1
     `).bind(tokenHash, Math.floor(Date.now() / 1e3)).first();
-    if (!user || user.status !== "active") return json5({ authenticated: false }, 401);
+    if (!user) {
+      await env2.LEADERBOARD_DB.prepare("DELETE FROM sessions WHERE token_hash = ?1").bind(tokenHash).run();
+      return new Response(JSON.stringify({ authenticated: false }), {
+        status: 401,
+        headers: { ...JSON_HEADERS3, "Set-Cookie": expiredCookie() }
+      });
+    }
     await env2.LEADERBOARD_DB.prepare(
       "UPDATE sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE token_hash = ?1"
     ).bind(tokenHash).run();
     return json5({
       authenticated: true,
-      user: { id: user.id, username: user.username, email: user.email, role: user.role }
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        sessionExpiresAt: user.session_expires_at
+      }
     });
   } catch (error3) {
     console.error("Unable to read session", error3);
@@ -1616,6 +1657,82 @@ async function onRequestGet5({ request, env: env2 }) {
 }
 __name(onRequestGet5, "onRequestGet5");
 __name2(onRequestGet5, "onRequestGet");
+var SESSION_COOKIE6 = "__Host-neon_session";
+var VALID_ROLES = /* @__PURE__ */ new Set(["player", "admin", "owner"]);
+function readCookie5(request, name) {
+  const match2 = request.headers.get("Cookie")?.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  if (!match2) return "";
+  try {
+    return decodeURIComponent(match2[1]);
+  } catch {
+    return "";
+  }
+}
+__name(readCookie5, "readCookie5");
+__name2(readCookie5, "readCookie");
+async function sha256Hex6(value) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+__name(sha256Hex6, "sha256Hex6");
+__name2(sha256Hex6, "sha256Hex");
+async function currentUser(request, env2) {
+  const token = readCookie5(request, SESSION_COOKIE6);
+  if (!token || !env2.LEADERBOARD_DB) return null;
+  const user = await env2.LEADERBOARD_DB.prepare(`
+    SELECT users.id, users.username, users.role, users.status
+    FROM sessions
+    JOIN users ON users.id = sessions.user_id
+    WHERE sessions.token_hash = ?1
+      AND sessions.expires_at > ?2
+      AND sessions.created_at > datetime('now', '-12 hours')
+      AND users.status = 'active'
+      AND users.role IN ('player', 'admin', 'owner')
+    LIMIT 1
+  `).bind(await sha256Hex6(token), Math.floor(Date.now() / 1e3)).first();
+  return user && VALID_ROLES.has(user.role) ? user : null;
+}
+__name(currentUser, "currentUser");
+__name2(currentUser, "currentUser");
+function protectedRole(pathname) {
+  if (pathname === "/flex" || pathname === "/flex.html") return "staff";
+  if (pathname === "/management" || pathname === "/management/" || pathname === "/management/index.html") return "owner";
+  return "";
+}
+__name(protectedRole, "protectedRole");
+__name2(protectedRole, "protectedRole");
+async function onRequest(context2) {
+  const url = new URL(context2.request.url);
+  const requiredRole = protectedRole(url.pathname);
+  if (!requiredRole) return context2.next();
+  let user = null;
+  try {
+    user = await currentUser(context2.request, context2.env);
+  } catch (error3) {
+    console.error("Unable to authorize protected page", error3);
+  }
+  const allowed = requiredRole === "owner" ? user?.role === "owner" : user?.role === "admin" || user?.role === "owner";
+  if (!allowed) {
+    const destination = new URL("/", url);
+    destination.searchParams.set("access", requiredRole);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        "Cache-Control": "no-store",
+        Location: destination.toString(),
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+  const response = await context2.next();
+  const guarded = new Response(response.body, response);
+  guarded.headers.set("Cache-Control", "private, no-store");
+  guarded.headers.set("X-Content-Type-Options", "nosniff");
+  guarded.headers.set("X-Frame-Options", "DENY");
+  return guarded;
+}
+__name(onRequest, "onRequest");
+__name2(onRequest, "onRequest");
 var routes = [
   {
     routePath: "/api/management/overview",
@@ -1707,6 +1824,13 @@ var routes = [
     method: "GET",
     middlewares: [],
     modules: [onRequestGet5]
+  },
+  {
+    routePath: "/",
+    mountPath: "/",
+    method: "",
+    middlewares: [onRequest],
+    modules: []
   }
 ];
 function lexer(str) {

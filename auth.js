@@ -1,4 +1,5 @@
 const authGate = document.querySelector("#auth-gate");
+const sessionLoading = document.querySelector("#session-loading");
 const menu = document.querySelector("#menu");
 const loginTab = document.querySelector("#login-tab");
 const registerTab = document.querySelector("#register-tab");
@@ -17,6 +18,10 @@ const authState = {
   user: null,
 };
 
+const VALID_ROLES = new Set(["player", "admin", "owner"]);
+let sessionRequest = null;
+let sessionExpiryTimer = 0;
+
 window.neonAuth = authState;
 
 function setAuthMessage(message = "", success = false) {
@@ -30,6 +35,15 @@ function setAuthBusy(form, busy) {
   });
 }
 
+function hideVisiblePasswords(root = document) {
+  root.querySelectorAll(".password-toggle").forEach((toggle) => {
+    const input = document.getElementById(toggle.dataset.passwordTarget);
+    if (input) input.type = "password";
+    toggle.setAttribute("aria-pressed", "false");
+    toggle.setAttribute("aria-label", "Show password");
+  });
+}
+
 function selectAuthTab(mode) {
   const loggingIn = mode === "login";
   loginTab.classList.toggle("active", loggingIn);
@@ -38,6 +52,7 @@ function selectAuthTab(mode) {
   registerTab.setAttribute("aria-selected", String(!loggingIn));
   loginForm.classList.toggle("hidden", !loggingIn);
   registerForm.classList.toggle("hidden", loggingIn);
+  hideVisiblePasswords();
   setAuthMessage();
   window.setTimeout(() => {
     (loggingIn ? document.querySelector("#login-username") : document.querySelector("#register-username"))?.focus();
@@ -54,22 +69,40 @@ function applyRole(role) {
   });
 }
 
+function scheduleSessionExpiry(expiresAt) {
+  window.clearTimeout(sessionExpiryTimer);
+  sessionExpiryTimer = 0;
+  const expiryMilliseconds = Number(expiresAt) * 1000;
+  if (!Number.isFinite(expiryMilliseconds)) return;
+  const delay = Math.max(0, expiryMilliseconds - Date.now());
+  sessionExpiryTimer = window.setTimeout(() => {
+    showAuthGate("YOUR 12-HOUR SESSION EXPIRED. SIGN IN AGAIN.");
+  }, delay);
+}
+
 function showMenuForUser(user) {
-  authState.user = user;
+  const role = VALID_ROLES.has(String(user?.role).toLowerCase()) ? String(user.role).toLowerCase() : "player";
+  const safeUser = { ...user, role };
+  authState.user = safeUser;
   authState.ready = true;
-  menuUsername.textContent = user.username;
-  menuRole.textContent = user.role.toUpperCase();
-  applyRole(user.role);
+  menuUsername.textContent = safeUser.username;
+  menuRole.textContent = role.toUpperCase();
+  applyRole(role);
+  scheduleSessionExpiry(safeUser.sessionExpiresAt);
+  sessionLoading.classList.add("hidden");
   authGate.classList.add("hidden");
   menu.classList.remove("hidden");
   loadLeaderboard();
-  window.dispatchEvent(new CustomEvent("neon-auth-changed", { detail: user }));
+  window.dispatchEvent(new CustomEvent("neon-auth-changed", { detail: safeUser }));
 }
 
 function showAuthGate(message = "") {
+  window.clearTimeout(sessionExpiryTimer);
+  sessionExpiryTimer = 0;
   authState.user = null;
   authState.ready = true;
   applyRole("player");
+  sessionLoading.classList.add("hidden");
   menu.classList.add("hidden");
   authGate.classList.remove("hidden");
   selectAuthTab("login");
@@ -80,6 +113,7 @@ function showAuthGate(message = "") {
 async function apiRequest(url, options = {}) {
   const response = await fetch(url, {
     credentials: "same-origin",
+    cache: "no-store",
     ...options,
     headers: options.body ? { "Content-Type": "application/json", ...(options.headers || {}) } : options.headers,
   });
@@ -94,15 +128,43 @@ async function apiRequest(url, options = {}) {
 }
 
 async function restoreSession() {
+  if (sessionRequest) return sessionRequest;
+  sessionRequest = (async () => {
+    try {
+      const payload = await apiRequest("/api/session");
+      if (payload.authenticated && payload.user) showMenuForUser(payload.user);
+      else showAuthGate();
+    } catch (error) {
+      if (/temporarily unavailable|invalid response/i.test(error.message)) {
+        showAuthGate(error.message);
+      } else {
+        showAuthGate();
+      }
+    }
+  })();
+  try {
+    await sessionRequest;
+  } finally {
+    sessionRequest = null;
+  }
+}
+
+async function revalidateSession() {
+  if (!authState.user || document.visibilityState === "hidden") return;
+  const previousUser = authState.user;
   try {
     const payload = await apiRequest("/api/session");
-    if (payload.authenticated && payload.user) showMenuForUser(payload.user);
-    else showAuthGate();
+    if (!payload.authenticated || !payload.user) {
+      showAuthGate("YOUR SESSION EXPIRED. SIGN IN AGAIN.");
+      return;
+    }
+    const changed = payload.user.id !== previousUser.id
+      || payload.user.username !== previousUser.username
+      || payload.user.role !== previousUser.role;
+    if (changed) showMenuForUser(payload.user);
   } catch (error) {
-    if (/temporarily unavailable|invalid response/i.test(error.message)) {
-      showAuthGate(error.message);
-    } else {
-      showAuthGate();
+    if (!/temporarily unavailable|invalid response/i.test(error.message)) {
+      showAuthGate("YOUR SESSION EXPIRED. SIGN IN AGAIN.");
     }
   }
 }
@@ -224,8 +286,27 @@ logoutButton.addEventListener("click", async () => {
 
 leaderboardRefresh.addEventListener("click", loadLeaderboard);
 window.addEventListener("neon-score-submitted", loadLeaderboard);
+document.querySelectorAll(".password-toggle").forEach((toggle) => {
+  toggle.addEventListener("click", () => {
+    const input = document.getElementById(toggle.dataset.passwordTarget);
+    if (!input) return;
+    const showing = input.type === "password";
+    input.type = showing ? "text" : "password";
+    toggle.setAttribute("aria-pressed", String(showing));
+    toggle.setAttribute("aria-label", showing ? "Hide password" : "Show password");
+    input.focus({ preventScroll: true });
+    const cursor = input.value.length;
+    input.setSelectionRange(cursor, cursor);
+  });
+});
 manageUsersButton.addEventListener("click", () => {
   window.open("/management/", "_blank", "noopener,noreferrer");
 });
+
+window.addEventListener("focus", revalidateSession);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") revalidateSession();
+});
+window.setInterval(revalidateSession, 60_000);
 
 restoreSession();

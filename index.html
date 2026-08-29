@@ -98,7 +98,16 @@
       <span>Neon Outpost requires a wider combat view.</span>
     </div>
 
-    <main id="auth-gate" class="overlay auth-overlay">
+    <main id="session-loading" class="overlay session-loading" aria-live="polite">
+      <section class="panel session-loading-panel">
+        <p class="eyebrow">OUTPOST IDENTITY NETWORK</p>
+        <strong>VERIFYING SESSION</strong>
+        <span>Checking encrypted access clearance...</span>
+        <i aria-hidden="true"></i>
+      </section>
+    </main>
+
+    <main id="auth-gate" class="overlay auth-overlay hidden">
       <section class="panel auth-panel" aria-labelledby="auth-title">
         <div class="auth-brand">
           <p class="eyebrow">OUTPOST IDENTITY TERMINAL</p>
@@ -112,14 +121,38 @@
           </div>
           <form id="login-form" class="auth-form">
             <label><span>USERNAME</span><input id="login-username" name="username" autocomplete="username" required /></label>
-            <label><span>PASSWORD</span><input id="login-password" name="password" type="password" autocomplete="current-password" required /></label>
+            <div class="auth-field">
+              <label for="login-password">PASSWORD</label>
+              <div class="password-input">
+                <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+                <button class="password-toggle" type="button" data-password-target="login-password" aria-label="Show password" aria-pressed="false">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z"></path><circle cx="12" cy="12" r="2.8"></circle><path class="password-eye-slash" d="m4 4 16 16"></path></svg>
+                </button>
+              </div>
+            </div>
             <button type="submit"><span>LOGIN</span><span aria-hidden="true">&gt;&gt;</span></button>
           </form>
           <form id="register-form" class="auth-form hidden">
             <label><span>USERNAME</span><input id="register-username" name="username" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" required /></label>
             <label><span>GMAIL</span><input id="register-email" name="email" type="email" autocomplete="email" placeholder="name@gmail.com" required /></label>
-            <label><span>PASSWORD</span><input id="register-password" name="password" type="password" autocomplete="new-password" minlength="7" pattern="(?=.*[0-9]).{7,}" required /></label>
-            <label><span>CONFIRM PASSWORD</span><input id="register-confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="7" required /></label>
+            <div class="auth-field">
+              <label for="register-password">PASSWORD</label>
+              <div class="password-input">
+                <input id="register-password" name="password" type="password" autocomplete="new-password" minlength="7" pattern="(?=.*[0-9]).{7,}" required />
+                <button class="password-toggle" type="button" data-password-target="register-password" aria-label="Show password" aria-pressed="false">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z"></path><circle cx="12" cy="12" r="2.8"></circle><path class="password-eye-slash" d="m4 4 16 16"></path></svg>
+                </button>
+              </div>
+            </div>
+            <div class="auth-field">
+              <label for="register-confirm-password">CONFIRM PASSWORD</label>
+              <div class="password-input">
+                <input id="register-confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="7" required />
+                <button class="password-toggle" type="button" data-password-target="register-confirm-password" aria-label="Show password" aria-pressed="false">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z"></path><circle cx="12" cy="12" r="2.8"></circle><path class="password-eye-slash" d="m4 4 16 16"></path></svg>
+                </button>
+              </div>
+            </div>
             <p class="password-rule">7+ characters and at least 1 number.</p>
             <button type="submit"><span>REGISTER</span><span aria-hidden="true">+</span></button>
           </form>

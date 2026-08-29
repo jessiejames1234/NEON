@@ -29,6 +29,7 @@ async function getOwner(request, env) {
     JOIN users ON users.id = sessions.user_id
     WHERE sessions.token_hash = ?1
       AND sessions.expires_at > ?2
+      AND sessions.created_at > datetime('now', '-12 hours')
       AND users.status = 'active'
       AND users.role = 'owner'
     LIMIT 1

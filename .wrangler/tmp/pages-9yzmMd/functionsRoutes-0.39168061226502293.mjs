@@ -11,6 +11,7 @@ import { onRequestGet as __api_register_js_onRequestGet } from "C:\\xampp\\htdoc
 import { onRequestOptions as __api_register_js_onRequestOptions } from "C:\\xampp\\htdocs\\3D game\\functions\\api\\register.js"
 import { onRequestPost as __api_register_js_onRequestPost } from "C:\\xampp\\htdocs\\3D game\\functions\\api\\register.js"
 import { onRequestGet as __api_session_js_onRequestGet } from "C:\\xampp\\htdocs\\3D game\\functions\\api\\session.js"
+import { onRequest as ___middleware_js_onRequest } from "C:\\xampp\\htdocs\\3D game\\functions\\_middleware.js"
 
 export const routes = [
     {
@@ -103,5 +104,12 @@ export const routes = [
       method: "GET",
       middlewares: [],
       modules: [__api_session_js_onRequestGet],
+    },
+  {
+      routePath: "/",
+      mountPath: "/",
+      method: "",
+      middlewares: [___middleware_js_onRequest],
+      modules: [],
     },
   ]

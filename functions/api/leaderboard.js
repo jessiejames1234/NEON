@@ -25,6 +25,7 @@ async function authenticatedUser(request, env) {
     JOIN users ON users.id = sessions.user_id
     WHERE sessions.token_hash = ?1
       AND sessions.expires_at > ?2
+      AND sessions.created_at > datetime('now', '-12 hours')
       AND users.status = 'active'
     LIMIT 1
   `).bind(await sha256Hex(token), Math.floor(Date.now() / 1000)).first();
