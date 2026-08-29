@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS leaderboard (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    score INTEGER NOT NULL DEFAULT 0 CHECK (score >= 0),
+    wave INTEGER NOT NULL DEFAULT 1 CHECK (wave >= 1),
+    kills INTEGER NOT NULL DEFAULT 0 CHECK (kills >= 0),
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS leaderboard_score_index
+ON leaderboard(score DESC);

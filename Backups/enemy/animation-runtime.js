@@ -19,7 +19,7 @@ export function applyCrawlerMalfunctionEffects(actor,elapsed,intensity=0,death=f
     if(!active){spark.visible=false;return;}
     const phase=spark.userData.fxPhase||0,burst=Math.sin(elapsed*(death?39:31)+phase),on=burst>.18;
     spark.visible=on;spark.position.copy(spark.userData.basePosition);spark.position.x+=Math.sin(elapsed*23+index)*.045*intensity;spark.position.y+=Math.cos(elapsed*19+index)*.035*intensity;
-    spark.rotation.copy(spark.userData.baseRotation);spark.rotation.x+=elapsed*(8+index);spark.rotation.z+=Math.sin(elapsed*17+phase)*1.1;spark.scale.copy(spark.userData.baseScale);spark.scale.y*=.45+Math.max(0,burst)*(death?2.3:1.65);spark.material.opacity=Math.min(1,(on?.92:0)*intensity*fade);
+    spark.rotation.copy(spark.userData.baseRotation);spark.rotation.x+=elapsed*(8+index);spark.rotation.z+=Math.sin(elapsed*17+phase)*1.1;spark.scale.copy(spark.userData.baseScale);spark.scale.y*=.45+Math.max(0,burst)*(death?2.3:1.65);spark.material.opacity=(on?.92:0)*intensity*fade;
   });
   actor.parts.crawlerEyes.forEach((eye,index)=>{
     if(death){
@@ -31,32 +31,6 @@ export function applyCrawlerMalfunctionEffects(actor,elapsed,intensity=0,death=f
     }
     eye.visible=!active||Math.sin(elapsed*22+index*.7)>-.78;
     if(active)eye.scale.copy(eye.userData.baseScale).multiplyScalar(.82+Math.max(0,Math.sin(elapsed*18+index))*.28);
-  });
-}
-
-function applyBrokenDroneBodyFailureEffects(actor,elapsed,intensity=0,death=false,fade=1){
-  const rig=actor.parts.brokenDrone,active=intensity>.001&&fade>.001;
-  if(!rig)return;
-  rig.failureSmoke?.forEach((puff,index)=>{
-    if(!active){puff.visible=false;return;}
-    const phase=puff.userData.fxPhase||0,cycle=(elapsed*(death?.82:.62)+phase)%1;
-    puff.visible=true;puff.position.copy(puff.userData.basePosition);
-    puff.position.x+=Math.sin(elapsed*2.1+index)*.09*intensity;
-    puff.position.y+=cycle*(death?.6:.43)*intensity;
-    puff.position.z+=Math.cos(elapsed*1.7+index)*.065*intensity;
-    puff.scale.copy(puff.userData.baseScale).multiplyScalar((.48+cycle*1.65)*intensity);
-    puff.material.opacity=Math.min(.62,Math.pow(1-cycle,1.35)*(death?.5:.38)*intensity*fade);
-  });
-  rig.failureSparks?.forEach((spark,index)=>{
-    if(!active){spark.visible=false;return;}
-    const phase=spark.userData.fxPhase||0,burst=Math.sin(elapsed*(death?44:35)+phase),on=burst>-.02;
-    spark.visible=on;spark.position.copy(spark.userData.basePosition);
-    spark.position.x+=Math.sin(elapsed*29+index)*.065*intensity;
-    spark.position.y+=Math.cos(elapsed*23+index)*.052*intensity;
-    spark.position.z+=Math.sin(elapsed*19+index*1.4)*.045*intensity;
-    spark.rotation.copy(spark.userData.baseRotation);spark.rotation.x+=elapsed*(11+index*.4);spark.rotation.z+=Math.sin(elapsed*21+phase)*1.4;
-    spark.scale.copy(spark.userData.baseScale);spark.scale.y*=.38+Math.max(0,burst)*(death?3.1:2.25);
-    spark.material.opacity=Math.min(1,(on?.95:0)*intensity*fade);
   });
 }
 
@@ -89,74 +63,13 @@ function animateCrawler(actor,elapsed,movementAmount,walkPhase,attackStrength){
   applyCrawlerMalfunctionEffects(actor,elapsed,0);
 }
 
-function animateBrokenDrone(actor,elapsed,movementAmount,walkPhase,attackStrength){
-  const rig=actor.parts.brokenDrone;
-  if(!rig)return;
-  const previousElapsed=actor.brokenDronePoseElapsed;
-  const poseDelta=previousElapsed===undefined||elapsed<previousElapsed?1/60:THREE.MathUtils.clamp(elapsed-previousElapsed,1/240,.1);
-  actor.brokenDronePoseElapsed=elapsed;
-  actor.brokenDroneMovementBlend=THREE.MathUtils.damp(actor.brokenDroneMovementBlend??0,movementAmount,7.5,poseDelta);
-  const move=actor.brokenDroneMovementBlend,attack=THREE.MathUtils.smootherstep(THREE.MathUtils.clamp(attackStrength,0,1),.02,.78);
-  const seed=actor.seed||0,engineBeat=Math.sin(elapsed*3.1+seed),travelBeat=Math.sin(walkPhase*.72+seed),faultBeat=Math.sin(elapsed*11.5+seed*2.3);
-
-  [actor.parts.body,actor.parts.head,rig.intactWing,rig.workingRotor,rig.brokenHub,rig.brokenBladeUpper,rig.brokenBladeLower,rig.brokenShard,rig.hangingCable,rig.faultLight,
-    ...rig.barrageBarrels,rig.workingThruster,rig.deadThruster,rig.intactTail,rig.damagedTail,rig.reactor,rig.reactorRing,rig.antenna,rig.loosePlate].forEach((part)=>part&&resetPart(part));
-  actor.parts.rings.forEach((part,index)=>{resetPart(part);part.rotation[index%2?"z":"y"]+=elapsed*(2.2+index*.6+attackStrength*5);});
-  actor.parts.glows.forEach((part,index)=>{resetPart(part);part.visible=true;part.scale.multiplyScalar(1+Math.sin(elapsed*(3.2+index*.09)+seed+index)*.055+attack*.18);});
-
-  const baseY=actor.animationBaseY??0;
-  actor.group.position.y=baseY+1.15+engineBeat*.075+travelBeat*move*.055+attack*.045;
-  actor.group.rotation.x=-move*.13+attack*.075+engineBeat*.012;
-  actor.group.rotation.z=engineBeat*.025+(travelBeat*.12-faultBeat*.018)*move-attack*.035;
-
-  // One healthy fan carries most of the airframe, while the destroyed side
-  // trembles and trails behind instead of mirroring it.
-  rig.workingRotor.rotation.y+=elapsed*(18+move*12+attack*18);
-  rig.intactWing.rotation.z+=travelBeat*move*.055-attack*.025;
-  rig.brokenHub.rotation.z+=faultBeat*(.035+move*.035+attack*.06);
-  rig.brokenBladeUpper.rotation.z+=faultBeat*(.045+attack*.09);
-  rig.brokenBladeLower.rotation.x-=Math.sin(elapsed*7.7+seed)*(.035+move*.025);
-  rig.brokenShard.rotation.y+=Math.sin(elapsed*4.3+seed)*.05;
-  rig.hangingCable.rotation.z+=Math.sin(elapsed*3.8+seed)*(.1+move*.08);
-  rig.loosePlate.rotation.x+=Math.sin(elapsed*6.1+seed)*(.025+move*.04+attack*.055);
-
-  // The cyclops scans while idle, locks forward in motion, and punches back
-  // during each shot.
-  actor.parts.head.rotation.y+=Math.sin(elapsed*.92+seed)*(1-move)*.16;
-  actor.parts.head.position.z-=attack*.075;
-  actor.parts.head.rotation.x+=attack*.1;
-  rig.eye.scale.multiplyScalar(1+attack*.28+Math.max(0,engineBeat)*.06);
-
-  rig.barrageBarrels.forEach((barrel,index)=>{
-    const stagger=.72+.28*Math.max(0,Math.sin(elapsed*18-index*1.7));
-    barrel.position.z-=attack*(.13+stagger*.09);
-    barrel.rotation.x+=attack*(index-1)*.025;
-  });
-  rig.workingThruster.scale.z*=1+move*.38+attack*.24+Math.max(0,engineBeat)*.12;
-  rig.deadThruster.rotation.z+=faultBeat*.025;
-  rig.intactTail.rotation.x-=travelBeat*move*.055;
-  rig.damagedTail.rotation.z+=faultBeat*(.025+move*.035);
-  rig.reactor.rotation.y+=elapsed*(1.8+move*1.2+attack*4);
-  rig.reactorRing.rotation.y+=elapsed*(2.6+attack*7);
-  rig.antenna.rotation.z+=Math.sin(elapsed*2.2+seed)*.055-travelBeat*move*.045;
-  rig.faultLight.visible=Math.sin(elapsed*(6.5+attack*8)+seed)>-.42;
-  applyCrawlerMalfunctionEffects(actor,elapsed,.42,false,1);
-  applyBrokenDroneBodyFailureEffects(actor,elapsed,0);
-}
-
 export function applyEnemyPose(actor,{elapsed=0,movementAmount=0,walkPhase=elapsed*(actor.speed||actor.type?.speed||1)*4.2,attackStrength=0,stunnedProgress=null}={}){
   const stride=Math.sin(walkPhase)*movementAmount;
   if(actor.typeId===1||actor.id===1)animateCrawler(actor,elapsed,movementAmount,walkPhase,attackStrength);
-  else if(actor.typeId===2||actor.id===2)animateBrokenDrone(actor,elapsed,movementAmount,walkPhase,attackStrength);
   else{
-    // Start every generic pose from a stable root transform. Stunned used to
-    // add rotation and subtract height every frame, eventually sinking units.
-    actor.group.rotation.z=0;
-    if(!actor.flying)actor.group.position.y=actor.deathBaseY??actor.animationBaseY??0;
     actor.parts.legs.forEach((part,index)=>{resetPart(part);if([1,3,7,17].includes(actor.typeId||actor.id))part.rotation.z+=stride*(index%2?.12:-.12);else part.rotation.x+=stride*(index%2?.18:-.18);});
     actor.parts.arms.forEach((part,index)=>{resetPart(part);part.rotation.x+=stride*(index%2?-.12:.12)-attackStrength*.5;});
     actor.parts.rotors.forEach((part,index)=>{resetPart(part);part.rotation.y+=elapsed*(index%2?-13:13);});
-    actor.parts.weaponRotors?.forEach((part,index)=>{resetPart(part);if(attackStrength>.01)part.rotation.y+=elapsed*(index%2?-24:24)*attackStrength;});
     actor.parts.rings.forEach((part,index)=>{resetPart(part);part.rotation[index%2?"z":"y"]+=elapsed*(1.5+index*.7+attackStrength*8);});
     actor.parts.glows.forEach((part,index)=>part.scale.copy(part.userData.baseScale).multiplyScalar(1+Math.sin(elapsed*(2.4+index*.07)+(actor.seed||0)+index)*.045+attackStrength*.08));
     actor.parts.weapons.forEach((part)=>{resetPart(part);part.position.z-=attackStrength*.13;});
@@ -179,28 +92,7 @@ export function applyEnemyPose(actor,{elapsed=0,movementAmount=0,walkPhase=elaps
       actor.parts.crawlerFeelers.forEach((part,index)=>part.rotation.z+=(part.userData.crawlerSide||1)*Math.sin(stunP*Math.PI*12+index)*.11);
       actor.parts.crawlerLegSets.forEach((leg,index)=>{leg.foot.rotation.z+=(leg.side||1)*Math.sin(stunP*Math.PI*10+index)*.055*faultPulse;leg.joint.position.y+=Math.sin(stunP*Math.PI*14+index)*.012*faultPulse;});
       applyCrawlerMalfunctionEffects(actor,elapsed,.78+faultPulse*.22,false,1);
-    }else if(actor.typeId===2||actor.id===2){
-      const rig=actor.parts.brokenDrone,fault=Math.sin(stunP*Math.PI*12),flutter=Math.sin(stunP*Math.PI*20);
-      // A disabled flying drone rests on its belly with the destroyed right
-      // side dipped toward the floor; only components twitch during the loop.
-      actor.group.rotation.x=.075+fault*.012;
-      actor.group.rotation.z=-.16+flutter*.018;
-      actor.group.position.y=(actor.animationBaseY??0)+.02+Math.abs(flutter)*.008;
-      if(rig){
-        rig.workingRotor.rotation.y=rig.workingRotor.userData.baseRotation.y+elapsed*(2.2+Math.max(0,fault)*3.5);
-        rig.brokenHub.rotation.z+=fault*.16;rig.brokenBladeUpper.rotation.z+=flutter*.13;rig.brokenBladeLower.rotation.x-=fault*.12;
-        rig.hangingCable.rotation.z+=fault*.2;rig.loosePlate.rotation.x+=flutter*.12;rig.damagedTail.rotation.z+=fault*.1;
-        actor.parts.head.rotation.z+=fault*.12;actor.parts.head.position.x+=flutter*.035;
-        rig.eye.visible=fault>-.35;rig.faultLight.visible=flutter>.15;
-        rig.workingThruster.scale.z*=.55+Math.max(0,fault)*.55;
-      }
-      applyCrawlerMalfunctionEffects(actor,elapsed,1.25,false,1);
-      applyBrokenDroneBodyFailureEffects(actor,elapsed,1.05,false,1);
-    }else{
-      actor.group.rotation.z=arc*1.05;
-      if(actor.flying)actor.group.position.y-=arc*.08;
-      else actor.group.position.y=(actor.deathBaseY??actor.animationBaseY??0)-arc*.08;
-    }
+    }else{actor.group.rotation.z+=arc*1.05;actor.group.position.y-=arc*.08;}
   }
 }
 
@@ -239,41 +131,6 @@ export function applyEnemyDeathPose(actor,time){
       eye.scale.copy(eye.userData.baseScale).multiplyScalar(.62+.38*eyeFade);
     });
     return time>=collapseDuration+1;
-  }
-  if(actor.typeId===2||actor.id===2){
-    const duration=actor.deathDuration||2.4,p=THREE.MathUtils.clamp(time/duration,0,1),rig=actor.parts.brokenDrone;
-    const fail=THREE.MathUtils.smootherstep(p,0,.32),fall=THREE.MathUtils.smootherstep(p,.12,.72),impact=THREE.MathUtils.smootherstep(p,.62,.9),fade=1-THREE.MathUtils.smootherstep(p,.72,1);
-    const fallSide=-1,startY=(actor.deathBaseY??0)+(actor.anchor?1.15:0);
-    actor.group.position.y=THREE.MathUtils.lerp(startY,0,fall);
-    actor.group.rotation.x=fail*.16-impact*.09;
-    actor.group.rotation.z=fallSide*(fail*.08+fall*.14+impact*.08);
-    actor.group.rotation.y=(actor.deathBaseRotationY||0)+fallSide*(fail*.7+fall*2.1);
-    if(actor.baseScale)actor.group.scale.copy(actor.baseScale).multiplyScalar(1-impact*.1);
-    [actor.parts.body,actor.parts.head,...actor.parts.weapons].forEach((part)=>part&&resetPart(part));
-    if(rig){
-      [rig.intactWing,rig.workingRotor,rig.brokenHub,rig.brokenBladeUpper,rig.brokenBladeLower,rig.brokenShard,rig.hangingCable,rig.workingThruster,rig.deadThruster,
-        rig.intactTail,rig.damagedTail,rig.reactor,rig.reactorRing,rig.antenna,rig.loosePlate].forEach((part)=>part&&resetPart(part));
-      const sputter=Math.max(0,Math.sin(time*24))*(1-fall),remainingSpin=duration*20*(p-.39*p*p);
-      rig.workingRotor.rotation.y+=remainingSpin;
-      rig.intactWing.rotation.z-=fail*.16+impact*.12;
-      rig.brokenHub.rotation.z+=Math.sin(time*18)*fail*.15+impact*.38;
-      rig.brokenBladeUpper.rotation.z+=Math.sin(time*22)*fail*.18+impact*.52;
-      rig.brokenBladeLower.rotation.x-=Math.sin(time*17)*fail*.15+impact*.28;
-      rig.brokenShard.rotation.y+=fall*1.8;rig.hangingCable.rotation.z+=Math.sin(time*12)*fail*.22+impact*.3;
-      rig.loosePlate.rotation.x+=Math.sin(time*20)*fail*.16+impact*.72;rig.damagedTail.rotation.z+=Math.sin(time*15)*fail*.12+impact*.35;
-      rig.workingThruster.scale.z*=.35+sputter*.85;rig.reactor.rotation.y+=time*(5-4*p);rig.reactorRing.rotation.y+=time*(8-6*p);
-      rig.eye.visible=fade>.01&&Math.sin(time*(18+fail*18))>-THREE.MathUtils.lerp(.9,.1,p);
-      rig.faultLight.visible=fade>.04&&Math.sin(time*31)>.22;
-      rig.barrageBarrels.forEach((barrel,index)=>{barrel.rotation.x+=(index-1)*impact*.18;barrel.position.y-=impact*(.04+index*.015);});
-    }
-    actor.group.traverse((child)=>{
-      if(!child.isMesh||!child.material)return;
-      child.material.transparent=true;
-      child.material.opacity=(child.userData.baseOpacity??1)*fade;
-    });
-    applyCrawlerMalfunctionEffects(actor,time,1.4,true,fade);
-    applyBrokenDroneBodyFailureEffects(actor,time,1.35,true,fade);
-    return p>=1;
   }
   actor.group.rotation.z=Math.min(Math.PI*.52,time*2.25);actor.group.rotation.y=(actor.deathBaseRotationY||0)+time*(actor.flying?5:.7);
   actor.group.position.y=Math.max(0,(actor.deathBaseY||0)-time*2.3);

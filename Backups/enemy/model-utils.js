@@ -62,7 +62,7 @@ export function createModelContext(definition,elite=false){
   const accentMaterial=makeMaterial(new THREE.Color(definition.stats.color).offsetHSL(.03,.05,.14),.18,.5);
   const glowMaterial=new THREE.MeshBasicMaterial({color:elite?0xffd35c:definition.stats.color,transparent:cloaked,opacity:cloaked?.5:1});
   const redGlow=new THREE.MeshBasicMaterial({color:elite?0xffd35c:0xff496c,transparent:cloaked,opacity:cloaked?.55:1});
-  const parts={legs:[],arms:[],rotors:[],weaponRotors:[],weapons:[],rings:[],glows:[],jaws:[],repairAnchors:[],crawlerArmor:[],crawlerPistons:[],crawlerFeelers:[],crawlerDrills:[],crawlerLegSets:[],crawlerEyes:[],crawlerSmoke:[],crawlerSparks:[],body:null,head:null};
+  const parts={legs:[],arms:[],rotors:[],weapons:[],rings:[],glows:[],jaws:[],crawlerArmor:[],crawlerPistons:[],crawlerFeelers:[],crawlerDrills:[],crawlerLegSets:[],crawlerEyes:[],crawlerSmoke:[],crawlerSparks:[],body:null,head:null};
   const add=(geometry,material,scale,position,rotation=[0,0,0],name="body")=>{
     const mesh=new THREE.Mesh(geometry,material);mesh.scale.set(...scale);mesh.position.set(...position);mesh.rotation.set(...rotation);mesh.name=name;mesh.castShadow=false;
     mesh.userData.basePosition=mesh.position.clone();mesh.userData.baseRotation=mesh.rotation.clone();mesh.userData.baseScale=mesh.scale.clone();group.add(mesh);
@@ -88,24 +88,5 @@ export function buildHumanoid(ctx,{width=.72,height=1,shoulderArmor=false,helmet
 
 export function finishModel(ctx){
   if(ctx.elite){const ring=ctx.add(ctx.torus,new THREE.MeshBasicMaterial({color:0xffd35c}),[1.25,1.25,1.25],[0,2.05,0],[Math.PI/2,0,0]);ctx.parts.rings.push(ring);}
-  const addRepairAnchor=(parent,position,name)=>{
-    const anchor=new THREE.Object3D();anchor.name=name;anchor.position.set(...position);parent.add(anchor);ctx.parts.repairAnchors.push(anchor);
-  };
-  const body=ctx.parts.body||ctx.group,head=ctx.parts.head||body;
-  if(ctx.definition.id===1){
-    // The crawler's front anchors follow its articulated head rig; the rear
-    // anchors follow the collapsing chassis during stunned/death poses.
-    addRepairAnchor(head,[-.16,.01,.18],"repair-head-left");
-    addRepairAnchor(head,[.16,.01,.18],"repair-head-right");
-    addRepairAnchor(body,[-.12,.12,0],"repair-core-left");
-    addRepairAnchor(body,[.12,-.12,0],"repair-core-right");
-  }else{
-    // Normalized local positions inherit every model-specific scale, rotation,
-    // flying offset and stunned transform from their actual body parts.
-    addRepairAnchor(head,[-.15,.04,.18],"repair-head-left");
-    addRepairAnchor(head,[.15,.04,.18],"repair-head-right");
-    addRepairAnchor(body,[-.18,.12,.18],"repair-core-left");
-    addRepairAnchor(body,[.18,-.12,.18],"repair-core-right");
-  }
   return {group:ctx.group,bodyMaterial:ctx.bodyMaterial,parts:ctx.parts,flying:ctx.definition.model.flying};
 }

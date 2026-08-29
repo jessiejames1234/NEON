@@ -502,64 +502,16 @@ function createRepairDroneModel(bodyMaterial,metalMaterial,darkMaterial,glowMate
   return group;
 }
 
-// Shared repair-station shell assets keep all five machines detailed without
-// allocating a separate material and geometry set for every chamber.
-const repairStationArmor=material(0x18313a,.3,.88);
-const repairStationEdge=material(0x456773,.22,.92);
-const repairStationDark=material(0x071116,.5,.76);
-const repairStationCopper=material(0x9b6127,.3,.82);
-const repairStationGlow=new THREE.MeshBasicMaterial({color:0x43f4d0,transparent:true,opacity:.82});
-const repairStationDimGlow=new THREE.MeshBasicMaterial({color:0x1c9d91,transparent:true,opacity:.42});
-const repairStationBaseGeometry=new RoundedBoxGeometry(3.82,.18,2.48,3,.06);
-const repairStationFasciaGeometry=new RoundedBoxGeometry(3.36,.34,.22,2,.045);
-const repairStationBeamGeometry=new RoundedBoxGeometry(3.44,.24,.28,2,.04);
-const repairStationBraceGeometry=new RoundedBoxGeometry(.18,3.12,.18,2,.035);
-const repairStationPodGeometry=new RoundedBoxGeometry(.34,1.36,.46,2,.055);
-const repairStationPanelGeometry=new RoundedBoxGeometry(1.72,.72,.1,2,.035);
-const repairStationCollarGeometry=new THREE.TorusGeometry(1.31,.075,8,28);
-const repairStationCollarMaterial=material(0x294b55,.25,.9);
-
 for(let slot=0;slot<5;slot+=1){
   const machine=new THREE.Group();machine.position.set(-10+slot*5,0,-47);scene.add(machine);
   const baseMat=material(0x1c3039,.42,.72);
-  const lowerPlinth=new THREE.Mesh(repairStationBaseGeometry,repairStationDark);lowerPlinth.position.y=.09;lowerPlinth.receiveShadow=true;machine.add(lowerPlinth);
   const base=new THREE.Mesh(new THREE.BoxGeometry(3.5,.35,2.2),baseMat);base.position.y=.18;base.receiveShadow=true;machine.add(base);shootableSurfaces.push(base);
-  const frontFascia=new THREE.Mesh(repairStationFasciaGeometry,repairStationArmor);frontFascia.position.set(0,.35,1.12);machine.add(frontFascia);
-  for(const x of [-1.22,-.72,.72,1.22]){
-    const vent=new THREE.Mesh(unitBoxGeometry,repairStationGlow);vent.scale.set(.26,.045,.018);vent.position.set(x,.35,1.238);machine.add(vent);
-  }
   const back=new THREE.Mesh(new THREE.BoxGeometry(3.25,3.25,.35),material(0x243d47,.38,.68));back.position.set(0,1.8,-.92);machine.add(back);shootableSurfaces.push(back);
   for(const x of [-1.48,1.48]){
     const pillar=new THREE.Mesh(new THREE.BoxGeometry(.22,3.15,.22),material(0x314d58,.34,.7));pillar.position.set(x,1.72,0);machine.add(pillar);
   }
-  // Reinforced exoskeleton, overhead gantry, and hydraulic service columns.
-  for(const x of [-1.52,1.52])for(const z of [-.77,.77]){
-    const brace=new THREE.Mesh(repairStationBraceGeometry,repairStationEdge);brace.position.set(x,1.72,z);machine.add(brace);
-    const foot=new THREE.Mesh(unitBoxGeometry,repairStationCopper);foot.scale.set(.32,.13,.38);foot.position.set(x,.36,z);machine.add(foot);
-  }
-  const crownFront=new THREE.Mesh(repairStationBeamGeometry,repairStationEdge);crownFront.position.set(0,3.22,.78);machine.add(crownFront);
-  const crownRear=new THREE.Mesh(repairStationBeamGeometry,repairStationArmor);crownRear.position.set(0,3.22,-.78);machine.add(crownRear);
-  for(const side of [-1,1]){
-    const powerPod=new THREE.Mesh(repairStationPodGeometry,repairStationArmor);powerPod.position.set(side*1.53,1.64,-.47);machine.add(powerPod);
-    const pistonCase=new THREE.Mesh(unitCylinderGeometry,repairStationDark);pistonCase.scale.set(.12,.62,.12);pistonCase.position.set(side*1.53,1.52,.47);machine.add(pistonCase);
-    const pistonRod=new THREE.Mesh(unitCylinderGeometry,repairStationCopper);pistonRod.scale.set(.052,.51,.052);pistonRod.position.set(side*1.53,1.54,.47);machine.add(pistonRod);
-    const podLight=new THREE.Mesh(unitBoxGeometry,repairStationDimGlow);podLight.scale.set(.045,.42,.245);podLight.position.set(side*1.708,1.68,-.47);machine.add(podLight);
-  }
   const glassMaterial=new THREE.MeshStandardMaterial({color:0x6fdbef,emissive:0x07151a,emissiveIntensity:.08,roughness:.22,metalness:.08,transparent:true,opacity:.18,depthWrite:false,side:THREE.DoubleSide});
   const glass=new THREE.Mesh(new THREE.CylinderGeometry(1.28,1.28,2.85,20,1,true),glassMaterial);glass.position.set(0,1.65,0);machine.add(glass);
-  for(const y of [.3,3.08]){
-    const collar=new THREE.Mesh(repairStationCollarGeometry,repairStationCollarMaterial);collar.rotation.x=Math.PI/2;collar.position.y=y;machine.add(collar);
-  }
-  // Rear diagnostic console and animated-looking energy bus details.
-  const diagnosticPanel=new THREE.Mesh(repairStationPanelGeometry,repairStationDark);diagnosticPanel.position.set(0,1.76,-.73);machine.add(diagnosticPanel);
-  for(let line=0;line<3;line+=1){
-    const trace=new THREE.Mesh(unitBoxGeometry,line===1?repairStationGlow:repairStationDimGlow);trace.scale.set(.58-line*.09,.035,.018);trace.position.set(-.18+line*.09,1.98-line*.22,-.665);machine.add(trace);
-  }
-  for(const x of [-.68,.68]){
-    const dial=new THREE.Mesh(unitCylinderGeometry,repairStationCopper);dial.scale.set(.065,.026,.065);dial.rotation.x=Math.PI/2;dial.position.set(x,1.52,-.66);machine.add(dial);
-  }
-  // Compact ceiling hub; the actual repair tools deploy from the hidden side bays.
-  const ceilingHub=new THREE.Mesh(unitCylinderGeometry,repairStationArmor);ceilingHub.scale.set(.31,.1,.31);ceilingHub.position.set(0,2.99,0);machine.add(ceilingHub);
   const ringMaterial=new THREE.MeshBasicMaterial({color:0x43f4d0,transparent:true,opacity:.2});
   const ring=new THREE.Mesh(new THREE.RingGeometry(1.12,1.38,24),ringMaterial);ring.rotation.x=-Math.PI/2;ring.position.y=.38;machine.add(ring);
   const buttonMaterial=new THREE.MeshBasicMaterial({color:0x641b26});
@@ -567,44 +519,21 @@ for(let slot=0;slot<5;slot+=1){
   const slashA=new THREE.Mesh(new THREE.BoxGeometry(.31,.055,.025),new THREE.MeshBasicMaterial({color:0xff6272}));slashA.position.copy(removeButton.position);slashA.position.z+=.07;slashA.rotation.z=.78;machine.add(slashA);
   const slashB=slashA.clone();slashB.rotation.z=-.78;machine.add(slashB);
   const slotLight=new THREE.Mesh(new THREE.SphereGeometry(.1,8,6),new THREE.MeshBasicMaterial({color:0x43f4d0,transparent:true,opacity:.3}));slotLight.position.set(0,2.5,.3);machine.add(slotLight);
-  // The scanners stay in the chamber, while the two articulated tools retract
-  // into armored side bays whenever the five-second taming cycle is inactive.
+  // Chamber repair hardware stays parked until a recovered robot is installed.
   const repairRig=new THREE.Group();repairRig.visible=true;machine.add(repairRig);
-  const repairArmRig=new THREE.Group();repairArmRig.visible=false;repairRig.add(repairArmRig);
-  const repairArms=[],repairHatches=[];
+  const repairArms=[];
   const repairMetal=material(0x415b66,.26,.9),repairDark=material(0x101a20,.42,.78);
-  const repairCopper=material(0xa96c2d,.25,.88),repairArmor=material(0x284a55,.24,.92);
   const repairGlow=new THREE.MeshBasicMaterial({color:0x72f6ff,transparent:true,opacity:.9});
   for(const side of [-1,1]){
-    const bay=new THREE.Group();bay.position.set(side*1.29,2.38,-.48);repairRig.add(bay);
-    const recess=new THREE.Mesh(new RoundedBoxGeometry(.62,1.22,.24,2,.055),repairDark);bay.add(recess);
-    const bayFrame=new THREE.Mesh(new THREE.TorusGeometry(.39,.045,6,4),repairMetal);bayFrame.scale.y=1.45;bayFrame.rotation.z=Math.PI/4;bayFrame.position.z=.14;bay.add(bayFrame);
-    const upperHatch=new THREE.Mesh(new RoundedBoxGeometry(.55,.48,.1,2,.035),repairArmor);upperHatch.position.set(0,.27,.2);bay.add(upperHatch);
-    const lowerHatch=new THREE.Mesh(new RoundedBoxGeometry(.55,.48,.1,2,.035),repairArmor);lowerHatch.position.set(0,-.27,.2);bay.add(lowerHatch);
-    const hatchSeam=new THREE.Mesh(unitBoxGeometry,repairGlow.clone());hatchSeam.scale.set(.21,.018,.012);hatchSeam.position.set(0,0,.26);bay.add(hatchSeam);
-    repairHatches.push({bay,upperHatch,lowerHatch,hatchSeam});
-
-    const pivot=new THREE.Group();pivot.position.set(side*1.31,2.38,-.34);repairArmRig.add(pivot);
-    const shoulder=new THREE.Mesh(new THREE.CylinderGeometry(.22,.25,.32,12),repairDark);shoulder.rotation.x=Math.PI/2;pivot.add(shoulder);
-    const shoulderRing=new THREE.Mesh(new THREE.TorusGeometry(.225,.035,7,14),repairGlow.clone());shoulderRing.position.z=.17;pivot.add(shoulderRing);
-    const upper=new THREE.Mesh(new RoundedBoxGeometry(1.05,.2,.22,2,.045),repairMetal);upper.position.x=-side*.49;pivot.add(upper);
-    const upperArmor=new THREE.Mesh(new RoundedBoxGeometry(.64,.26,.12,2,.035),repairArmor);upperArmor.position.set(-side*.42,.08,.08);pivot.add(upperArmor);
-    const upperPiston=new THREE.Mesh(unitCylinderGeometry,repairCopper);upperPiston.scale.set(.045,.36,.045);upperPiston.rotation.z=Math.PI/2;upperPiston.position.set(-side*.48,-.13,.03);pivot.add(upperPiston);
+    const pivot=new THREE.Group();pivot.position.set(side*1.31,2.38,.28);repairRig.add(pivot);
+    const shoulder=new THREE.Mesh(new THREE.CylinderGeometry(.19,.22,.28,10),repairDark);shoulder.rotation.x=Math.PI/2;pivot.add(shoulder);
+    const upper=new THREE.Mesh(new RoundedBoxGeometry(1.02,.15,.17,2,.035),repairMetal);upper.position.x=-side*.49;pivot.add(upper);
     const elbow=new THREE.Group();elbow.position.x=-side*.98;pivot.add(elbow);
-    const joint=new THREE.Mesh(new THREE.SphereGeometry(.18,12,8),repairDark);elbow.add(joint);
-    const jointRing=new THREE.Mesh(new THREE.TorusGeometry(.185,.03,6,14),repairCopper);jointRing.position.z=.12;elbow.add(jointRing);
-    const lower=new THREE.Mesh(new RoundedBoxGeometry(.19,.8,.18,2,.035),repairMetal);lower.position.y=-.38;elbow.add(lower);
-    const lowerPiston=new THREE.Mesh(unitCylinderGeometry,repairCopper);lowerPiston.scale.set(.04,.29,.04);lowerPiston.position.set(side*.13,-.37,.04);elbow.add(lowerPiston);
-    const wrist=new THREE.Group();wrist.position.y=-.82;elbow.add(wrist);
-    const wristBody=new THREE.Mesh(new THREE.CylinderGeometry(.13,.16,.25,10),repairDark);wristBody.position.y=-.08;wrist.add(wristBody);
-    const emitter=new THREE.Mesh(new THREE.SphereGeometry(.105,10,7),repairGlow.clone());emitter.position.y=-.23;wrist.add(emitter);
-    const prongs=[];
-    for(const clawSide of [-1,1]){
-      const prong=new THREE.Mesh(unitBoxGeometry,repairCopper);prong.scale.set(.045,.22,.045);prong.position.set(clawSide*.1,-.37,0);prong.rotation.z=clawSide*.24;wrist.add(prong);prongs.push(prong);
-    }
-    const beamMaterial=new THREE.MeshBasicMaterial({color:0x72f6ff,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending});
-    const beam=new THREE.Mesh(unitCylinderGeometry,beamMaterial);beam.scale.set(.025,.34,.025);beam.position.y=-.58;beam.visible=false;wrist.add(beam);
-    repairArms.push({side,pivot,elbow,wrist,emitter,prongs,beam,shoulderRing});
+    const joint=new THREE.Mesh(new THREE.SphereGeometry(.16,10,7),repairDark);elbow.add(joint);
+    const lower=new THREE.Mesh(new RoundedBoxGeometry(.16,.78,.15,2,.03),repairMetal);lower.position.y=-.36;elbow.add(lower);
+    const tool=new THREE.Mesh(new THREE.CylinderGeometry(.075,.11,.34,9),repairDark);tool.position.y=-.83;tool.rotation.x=.08;elbow.add(tool);
+    const emitter=new THREE.Mesh(new THREE.SphereGeometry(.095,9,6),repairGlow.clone());emitter.position.y=-1.02;elbow.add(emitter);
+    repairArms.push({side,pivot,elbow,emitter});
   }
   const repairScanners=[];
   for(const height of [.72,1.55,2.38]){
@@ -642,7 +571,7 @@ for(let slot=0;slot<5;slot+=1){
   );
   carryLabel.position.set(0,4.15,.2);carryLabel.visible=false;machine.add(carryLabel);
   const interactionHighlight=createInteractionHighlight(machine,0x35ff82);
-  const machineData={index:slot,group:machine,glass,glassMaterial,ring,ringMaterial,removeButton,buttonMaterial,slotLight,carryLabel,interactionHighlight,repairRig,repairArmRig,repairArms,repairHatches,repairScanners,repairSparks,droneDocks,recoveryRingGreen,recoveryRingYellow,recoveryRingGreenMaterial,recoveryRingYellowMaterial,processingEnemy:null,tamedEnemy:null,display:null,storedDisplay:null,readyAt:0,repairSoundAt:0,repairDeploy:0,mobileMarker:null,mobileMarkerTitle:null,mobileMarkerStatus:null,mobileRemoveButton:null};
+  const machineData={index:slot,group:machine,glass,glassMaterial,ring,ringMaterial,removeButton,buttonMaterial,slotLight,carryLabel,interactionHighlight,repairRig,repairArms,repairScanners,repairSparks,droneDocks,recoveryRingGreen,recoveryRingYellow,recoveryRingGreenMaterial,recoveryRingYellowMaterial,processingEnemy:null,tamedEnemy:null,display:null,storedDisplay:null,readyAt:0,repairSoundAt:0,mobileMarker:null,mobileMarkerTitle:null,mobileMarkerStatus:null,mobileRemoveButton:null};
   const mobileMarker=document.createElement("div");mobileMarker.className="mobile-world-marker mobile-machine-marker";
   const mobileCopy=document.createElement("div");
   const mobileTitle=document.createElement("strong");mobileTitle.textContent=`TAMING MACHINE ${slot+1}`;
@@ -851,81 +780,6 @@ const miniRepairDroneDarkMaterial=new THREE.MeshStandardMaterial({color:0x06110c
 const miniRepairDroneGlowMaterial=new THREE.MeshBasicMaterial({color:0x4dff8a,transparent:true,opacity:.95});
 const repairDroneUp=new THREE.Vector3(0,1,0),repairDroneBeamDirection=new THREE.Vector3(),repairDroneTarget=new THREE.Vector3();
 const repairDroneCurveA=new THREE.Vector3(),repairDroneCurveC=new THREE.Vector3();
-const repairDroneAnchor=new THREE.Vector3(),repairDroneOutward=new THREE.Vector3(),repairDroneRaycaster=new THREE.Raycaster();
-const repairDroneModelBounds=new THREE.Box3(),repairDronePartBounds=new THREE.Box3(),repairDroneBoundsCenter=new THREE.Vector3(),repairDroneBoundsSize=new THREE.Vector3();
-const enemyFloorBounds=new THREE.Box3(),enemyFloorMeshBounds=new THREE.Box3();
-
-function keepEnemyAboveArenaFloor(enemy,clearance=.012){
-  if(!enemy?.group||!enemy.repairSurfaceMeshes?.length)return;
-  enemy.group.updateMatrixWorld(true);enemyFloorBounds.makeEmpty();
-  for(const mesh of enemy.repairSurfaceMeshes){
-    if(!mesh.visible||!mesh.geometry)continue;
-    if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();
-    if(!mesh.geometry.boundingBox)continue;
-    enemyFloorMeshBounds.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
-    enemyFloorBounds.union(enemyFloorMeshBounds);
-  }
-  if(Number.isFinite(enemyFloorBounds.min.y)&&enemyFloorBounds.min.y<clearance)enemy.group.position.y+=clearance-enemyFloorBounds.min.y;
-}
-
-function enemyRepairAnchorPosition(enemy,index,target=repairDroneAnchor){
-  const anchors=enemy.parts?.repairAnchors;
-  if(anchors?.length){anchors[index%anchors.length].getWorldPosition(target);return target;}
-  return target.set(enemy.group.position.x,enemy.group.position.y+Math.max(.45,enemy.type.scale*.65),enemy.group.position.z);
-}
-
-function enemyRandomRepairSectionPosition(enemy,droneIndex,cycleIndex,target=repairDroneAnchor){
-  const surfaces=enemy.repairSurfaceMeshes;
-  if(!surfaces?.length)return enemyRepairAnchorPosition(enemy,droneIndex,target);
-  // A stable hash changes only when a new repair route begins. This avoids
-  // flicker while distributing the four lasers across different real meshes.
-  const hash=Math.abs(Math.sin((cycleIndex+1)*91.733+(droneIndex+1)*37.719+(enemy.seed||0)*11.17));
-  const meshIndex=Math.min(surfaces.length-1,Math.floor(hash*surfaces.length));
-  surfaces[meshIndex].getWorldPosition(target);
-  return target;
-}
-
-function measureRepairDroneOrbit(enemy){
-  const repairKey=enemy.tamedRepairStartedAt??-1;
-  if(enemy.repairDroneOrbitMetrics?.repairKey===repairKey)return enemy.repairDroneOrbitMetrics;
-  enemy.group.updateMatrixWorld(true);
-  repairDroneModelBounds.makeEmpty();
-  for(const mesh of enemy.repairSurfaceMeshes||[]){
-    if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();
-    repairDronePartBounds.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
-    repairDroneModelBounds.union(repairDronePartBounds);
-  }
-  if(repairDroneModelBounds.isEmpty()){
-    repairDroneBoundsCenter.set(enemy.group.position.x,enemy.group.position.y+Math.max(.45,enemy.type.scale*.65),enemy.group.position.z);
-    repairDroneBoundsSize.set(enemy.type.scale*1.4,enemy.type.scale,enemy.type.scale*1.4);
-  }else{
-    repairDroneModelBounds.getCenter(repairDroneBoundsCenter);
-    repairDroneModelBounds.getSize(repairDroneBoundsSize);
-  }
-  const bodyRadius=Math.max(repairDroneBoundsSize.x,repairDroneBoundsSize.z)*.5;
-  const clearance=THREE.MathUtils.clamp(.38+bodyRadius*.14,.46,.9);
-  enemy.repairDroneOrbitMetrics={
-    repairKey,
-    center:repairDroneBoundsCenter.clone(),
-    radius:Math.max(.9,bodyRadius+clearance),
-    minRadius:Math.max(.75,bodyRadius+clearance*.68),
-    minY:Math.max(.34,repairDroneModelBounds.isEmpty()?repairDroneBoundsCenter.y-.1:repairDroneModelBounds.min.y+.18),
-    maxY:Math.max(.8,repairDroneModelBounds.isEmpty()?repairDroneBoundsCenter.y+.65:repairDroneModelBounds.max.y+clearance*.72),
-  };
-  return enemy.repairDroneOrbitMetrics;
-}
-
-function enemyRepairSurfacePosition(enemy,dronePosition,anchorPosition,target=repairDroneTarget){
-  repairDroneBeamDirection.subVectors(anchorPosition,dronePosition);
-  const distance=repairDroneBeamDirection.length();
-  if(distance>.001&&enemy.repairSurfaceMeshes?.length){
-    repairDroneRaycaster.set(dronePosition,repairDroneBeamDirection.multiplyScalar(1/distance));
-    repairDroneRaycaster.near=.02;repairDroneRaycaster.far=distance+.45;
-    const hit=repairDroneRaycaster.intersectObjects(enemy.repairSurfaceMeshes,false)[0];
-    if(hit){target.copy(hit.point);return target;}
-  }
-  return target.copy(anchorPosition);
-}
 
 function buildRepairDroneRoute(start,end){
   const startCell=nearestWalkableCell(worldToNav(start.x),worldToNav(start.z));
@@ -2058,11 +1912,8 @@ function spawnEnemy(typeId, elite = false) {
     nextIdleSound: clock.elapsedTime + (typeId === 1 ? .8 + Math.random() : 1.5 + Math.random() * 2.5),
     nextStepSound: clock.elapsedTime + (typeId === 1 ? .08 : Math.random() * .3),
     animationBaseY: 0, baseScale: group.scale.clone(), deathBaseY: group.position.y,
-    deathBaseRotationY: group.rotation.y, deathDuration: (typeId===1||typeId===2)?(getEnemyDefinition(typeId).animations.deathDuration||2.4):1.2,
+    deathBaseRotationY: group.rotation.y, deathDuration: typeId===1?(getEnemyDefinition(typeId).animations.deathDuration||2.4):1.2,
   };
-  const nonRepairSurfaces=new Set([...parts.rings,...parts.glows,...parts.crawlerSmoke,...parts.crawlerSparks]);
-  enemy.repairSurfaceMeshes=[];
-  group.traverse((child)=>{if(child.isMesh&&!child.userData.crawlerDamageFx&&!nonRepairSurfaces.has(child))enemy.repairSurfaceMeshes.push(child);});
   if(typeId===1)enemy.skillPoseSnapshots=captureEnemySkillPose(group);
   group.traverse((child) => {
     if (!child.isMesh||child.userData.crawlerDamageFx) return;
@@ -2319,7 +2170,7 @@ function makeEnemyCapturable(enemy) {
   removeHostileTracking(enemy);
   enemy.alive=false; enemy.dying=false; enemy.capturable=true; enemy.captureTimeRemaining=CAPTURABLE_LIFETIME;
   enemy.group.visible=true; enemy.group.position.y=Math.max(0,enemy.group.position.y);
-  enemy.group.rotation.x=0; enemy.group.rotation.z=(enemy.typeId===1||enemy.typeId===2)?0:.92;
+  enemy.group.rotation.x=0; enemy.group.rotation.z=enemy.typeId===1?0:.92;
   enemy.steering.set(0,0,0);
   removeEnemyFromHitMeshes(enemy);
   if(enemy.typeId===1){enemy.burrowState=null;removeScrapBurrowMarker(enemy);}
@@ -2722,37 +2573,17 @@ function animateTransportedEnemy(enemy,elapsed,placement){
 function updateMachineRepairAnimation(machine,delta,elapsed,progress,linkedRecovery=false){
   const active=Boolean(machine.processingEnemy);
   machine.repairRig.visible=true;
-  machine.repairDeploy=THREE.MathUtils.damp(machine.repairDeploy||0,active?1:0,active?7.5:5.5,delta);
-  const deploy=machine.repairDeploy*machine.repairDeploy*(3-2*machine.repairDeploy);
-  machine.repairArmRig.visible=machine.repairDeploy>.012;
-  machine.repairHatches.forEach((hatch,index)=>{
-    const stagger=THREE.MathUtils.clamp(deploy*1.18-index*.06,0,1);
-    hatch.upperHatch.position.y=.27+stagger*.36;
-    hatch.lowerHatch.position.y=-.27-stagger*.36;
-    hatch.upperHatch.rotation.z=(index?1:-1)*stagger*.08;
-    hatch.lowerHatch.rotation.z=(index?-1:1)*stagger*.08;
-    hatch.hatchSeam.material.opacity=.2+stagger*.78;
-    hatch.hatchSeam.scale.x=.21+stagger*.12;
-  });
-  machine.repairArms.forEach((arm,index)=>{
-    arm.pivot.position.set(arm.side*THREE.MathUtils.lerp(1.42,1.31,deploy),THREE.MathUtils.lerp(2.42,2.38,deploy),THREE.MathUtils.lerp(-.34,.28,deploy));
-    const armScale=.12+deploy*.88;arm.pivot.scale.setScalar(armScale);
-    arm.pivot.rotation.y=arm.side*THREE.MathUtils.lerp(.72,0,deploy);
-    arm.shoulderRing.material.opacity=.18+deploy*.72;
-    if(!active){
-      arm.pivot.rotation.z=arm.side*THREE.MathUtils.lerp(1.18,.08,deploy);
-      arm.elbow.rotation.z=-arm.side*.08;
-      arm.elbow.position.y=0;
-      arm.wrist.rotation.y=0;
-      arm.emitter.material.opacity=.08*deploy;
-      arm.beam.visible=false;arm.beam.material.opacity=0;
-      arm.prongs.forEach((prong,prongIndex)=>{prong.rotation.z=(prongIndex?1:-1)*.12;});
-    }
-  });
   if(linkedRecovery){
     // A recovering companion keeps its stunned pose while the station itself
     // remains parked. Only the internal scanner circles run, using the same
     // sweep as the five-second taming sequence but in recovery green.
+    machine.repairArms.forEach((arm)=>{
+      arm.pivot.rotation.z=arm.side*.08;
+      arm.elbow.rotation.z=-arm.side*.08;
+      arm.elbow.position.y=0;
+      arm.emitter.material.opacity=.16;
+      arm.emitter.scale.setScalar(.8);
+    });
     const cycle=elapsed*5.2+machine.index*.7;
     machine.repairScanners.forEach((scanner,index)=>{
       scanner.visible=true;
@@ -2766,6 +2597,13 @@ function updateMachineRepairAnimation(machine,delta,elapsed,progress,linkedRecov
     return;
   }
   if(!active){
+    machine.repairArms.forEach((arm)=>{
+      arm.pivot.rotation.z=arm.side*.08;
+      arm.elbow.rotation.z=-arm.side*.08;
+      arm.elbow.position.y=0;
+      arm.emitter.material.opacity=.16;
+      arm.emitter.scale.setScalar(.8);
+    });
     machine.repairScanners.forEach((scanner,index)=>{
       scanner.visible=true;
       scanner.material.color.setHex(0x72f6ff);
@@ -2779,25 +2617,12 @@ function updateMachineRepairAnimation(machine,delta,elapsed,progress,linkedRecov
   }
   const cycle=elapsed*5.2+machine.index*.7;
   machine.repairArms.forEach((arm,index)=>{
-    const calibration=THREE.MathUtils.smoothstep(deploy,.45,.92);
     const workingStroke=.5+.5*Math.sin(cycle+index*Math.PI);
-    const precisionWave=Math.sin(cycle*1.35+index);
-    arm.pivot.rotation.z=arm.side*THREE.MathUtils.lerp(.82,.13+.18*workingStroke,calibration);
-    arm.elbow.rotation.z=-arm.side*(.08+calibration*(.12+.16*precisionWave));
-    arm.elbow.position.y=-workingStroke*.11*calibration;
-    arm.wrist.rotation.y=cycle*(index?-.34:.34)*calibration;
-    arm.wrist.rotation.z=Math.sin(cycle*1.8+index)*.12*calibration;
-    arm.prongs.forEach((prong,prongIndex)=>{
-      const direction=prongIndex?1:-1;
-      prong.rotation.z=direction*(.12+.22*workingStroke*calibration);
-    });
-    const toolPulse=Math.max(0,Math.sin(cycle*2.4+index*Math.PI))*calibration;
-    arm.emitter.material.opacity=.12*deploy+.84*toolPulse;
-    arm.emitter.scale.setScalar(.72+deploy*.18+toolPulse*.42);
-    arm.beam.visible=calibration>.25&&toolPulse>.18;
-    arm.beam.material.opacity=arm.beam.visible?toolPulse*.48:0;
-    arm.beam.scale.y=.22+workingStroke*.26;
-    arm.beam.position.y=-.47-arm.beam.scale.y;
+    arm.pivot.rotation.z=arm.side*(.13+.18*workingStroke);
+    arm.elbow.rotation.z=-arm.side*(.2+.16*Math.sin(cycle*1.35+index));
+    arm.elbow.position.y=-workingStroke*.11;
+    arm.emitter.material.opacity=.48+.48*Math.max(0,Math.sin(cycle*2.4+index*Math.PI));
+    arm.emitter.scale.setScalar(.82+workingStroke*.38);
   });
   machine.repairScanners.forEach((scanner,index)=>{
     scanner.visible=true;
@@ -3128,7 +2953,6 @@ function updateEnemyAnimation(enemy, delta, elapsed, movementSpeed) {
   else if(enemy.typeId===1)enemy.nextCrawlerStunnedSound=0;
   const stunnedProgress=stunned?(elapsed%stunnedDuration)/stunnedDuration:null;
   applyEnemyPose(enemy,{elapsed,movementAmount,walkPhase:enemy.walkPhase,attackStrength:enemy.attackAnimation,stunnedProgress});
-  if(stunned)keepEnemyAboveArenaFloor(enemy);
   if(enemy.skillAnimation&&elapsed<enemy.skillAnimation.endsAt){
     applyEnemySkillPose(enemy,getEnemyDefinition(enemy.typeId),elapsed-enemy.skillAnimation.startedAt,enemy.skillAnimation.duration);
   }else if(enemy.skillAnimation)enemy.skillAnimation=null;
@@ -3142,9 +2966,7 @@ function updateDyingEnemy(enemy, delta) {
     enemy.group.traverse((child)=>{if(child.isMesh&&child.material)child.userData.baseOpacity=child.material.opacity;});
   }
   enemy.deathTime += delta;
-  const complete=applyEnemyDeathPose(enemy,enemy.deathTime);
-  if(!complete&&enemy.typeId!==1)keepEnemyAboveArenaFloor(enemy);
-  return complete;
+  return applyEnemyDeathPose(enemy,enemy.deathTime);
 }
 
 const ABILITY_COOLDOWNS=Object.freeze(ENEMY_DEFINITIONS.map((definition)=>definition?.skill.cooldown||0));
@@ -3332,10 +3154,8 @@ function activateSignatureAbility(enemy, elapsed, distance, target = null) {
   const id = enemy.typeId;
   const definition=getEnemyDefinition(id);
   const visualColor=combatAbilityColor(enemy);
-  if (id === 1 && distance <= (definition.skill.minDistance || enemy.type.range)) {
-    // Stay above ground and use direct combat when the target is already near.
-    // The crawler's melee range is intentionally smaller than its safe dig
-    // distance, so use the skill-specific threshold here.
+  if (id === 1 && distance <= enemy.type.range) {
+    // Stay in melee combat instead of disappearing underneath the player.
     enemy.abilityAt = elapsed + .5;
     return;
   }
@@ -3363,16 +3183,7 @@ function activateSignatureAbility(enemy, elapsed, distance, target = null) {
       statusEl.textContent = "Scrap Crawler digging down - move away";
       break;
     }
-    case "brokenDroneBarrage":
-      // Barrage is a planted firing animation, not a stun. The old
-      // crashAfterBurst flag fed E02 into the shared knockdown pose and made the
-      // whole drone roll/drop after shooting.
-      enemy.burstShots = 4;
-      enemy.burstAt = elapsed;
-      enemy.crashAfterBurst = false;
-      enemy.rootedUntil = elapsed + definition.animations.skillDuration;
-      enemy.steering.set(0, 0, 0);
-      break;
+    case "brokenDroneBarrage": enemy.burstShots = 4; enemy.burstAt = elapsed; enemy.crashAfterBurst = true; break;
     case "glowRatRush":
       enemies.forEach((ally)=>{if(ally.alive&&ally.tamed===enemy.tamed&&ally.typeId===3&&ally.group.position.distanceTo(enemy.group.position)<9)ally.speedBoostUntil=elapsed+5;});
       enemy.explodesOnDeath = true;
@@ -3422,7 +3233,7 @@ function activateSignatureAbility(enemy, elapsed, distance, target = null) {
       }
       teleportNearCombatTarget(enemy,target);
       break;
-    case "minigunBurst": enemy.burstShots = 12; enemy.burstAt = elapsed; enemy.rootedUntil = elapsed + 3; break;
+    case "minigunBurst": enemy.burstShots = 12; enemy.burstAt = elapsed; enemy.stunnedUntil = elapsed + 3; break;
     case "gravityOrb":
       createAbilityEffect("gravity-orb", combatTargetPosition(target).clone(), { color: visualColor, shape:"orb", y:1, radius:5, life:5, damage:7, hp:75, target });
       break;
@@ -3656,26 +3467,8 @@ function animateTamedAura(enemy, delta, elapsed) {
 function configureRepairDroneDeployment(enemy,drone,index,startPosition){
   drone.launchPosition.copy(startPosition);
   const arrivalAngle=index*Math.PI*.5,arrivalRadius=1.05+(index%2)*.14;
-  enemy.group.updateMatrixWorld(true);
-  enemyRepairAnchorPosition(enemy,index,repairDroneAnchor);
-  // Capture a stable orbit center. The repair laser may continue following the
-  // animated body surface, but the drone itself must not inherit the stunned
-  // pose's shake, roll, or electrical jolts.
-  if(!drone.orbitCenter)drone.orbitCenter=new THREE.Vector3();
-  // Measure the actual animated model rather than estimating from its type
-  // scale. Wide, tall, flat, and irregular enemies therefore receive the
-  // correct drone clearance.
-  const orbitMetrics=measureRepairDroneOrbit(enemy);
-  drone.orbitCenter.copy(orbitMetrics.center);
-  drone.orbitRadius=orbitMetrics.radius;
-  drone.orbitMinRadius=orbitMetrics.minRadius;
-  drone.orbitMinY=orbitMetrics.minY;
-  drone.orbitMaxY=orbitMetrics.maxY;
-  repairDroneOutward.set(repairDroneAnchor.x-enemy.group.position.x,0,repairDroneAnchor.z-enemy.group.position.z);
-  if(repairDroneOutward.lengthSq()<.01)repairDroneOutward.set(Math.cos(arrivalAngle),0,Math.sin(arrivalAngle));else repairDroneOutward.normalize();
-  drone.deployTarget.copy(repairDroneAnchor).addScaledVector(repairDroneOutward,arrivalRadius);
-  drone.deployTarget.y+=.34+(index%2)*.16;
-  enemyRepairSurfacePosition(enemy,drone.deployTarget,repairDroneAnchor,drone.contactTarget);
+  const centerY=enemy.group.position.y+Math.max(.45,enemy.type.scale*.65);
+  drone.deployTarget.set(enemy.group.position.x+Math.cos(arrivalAngle)*arrivalRadius,centerY+.34+(index%2)*.22,enemy.group.position.z+Math.sin(arrivalAngle)*arrivalRadius);
   drone.deployRoute=buildRepairDroneRoute(drone.launchPosition,drone.deployTarget);
   drone.deployDuration=THREE.MathUtils.clamp(drone.deployRoute.totalLength/5.6,.55,4.2);
   drone.previousFlightPosition.copy(drone.launchPosition);
@@ -3717,7 +3510,7 @@ function createCompanionRepairDrones(enemy){
     const drone={
       group,rotors,beam,eye,eyes,emitter,contactMaterial,contactGlow,contactRing,repairSparks,
       launchPosition:launchPosition.clone(),deployTarget:new THREE.Vector3(),deployRoute:null,
-      contactTarget:new THREE.Vector3(),orbitCenter:new THREE.Vector3(),previousFlightPosition:launchPosition.clone(),deployDuration:1.15,settleDuration:.72
+      previousFlightPosition:launchPosition.clone(),deployDuration:1.15,settleDuration:.72
     };
     configureRepairDroneDeployment(enemy,drone,index,launchPosition);
     enemy.repairDrones.push(drone);
@@ -3727,7 +3520,7 @@ function createCompanionRepairDrones(enemy){
 
 function updateCompanionRepairDrones(enemy,delta,elapsed,repairProgress){
   createCompanionRepairDrones(enemy);
-  enemy.group.updateMatrixWorld(true);
+  const centerY=enemy.group.position.y+Math.max(.45,enemy.type.scale*.65);
   enemy.repairDrones.forEach((drone,index)=>{
     const deployAge=Math.max(0,elapsed-(enemy.repairDroneDeployStartedAt??elapsed));
     const deployment=Math.min(1,deployAge/drone.deployDuration);
@@ -3738,62 +3531,34 @@ function updateCompanionRepairDrones(enemy,delta,elapsed,repairProgress){
       drone.beam.visible=false;drone.contactGlow.visible=false;drone.contactRing.visible=false;drone.repairSparks.forEach((spark)=>{spark.visible=false;});pulseRepairDroneLights(drone,1+.18*Math.sin(elapsed*12+index));
       return;
     }
-    // Travel through a large arc, stop to weld, then continue from that exact
-    // location. Equal phase spacing keeps the four drones separated while the
-    // repeated arcs eventually inspect every side of the tamed unit.
+    // Each drone owns a separate 90-degree sector, preventing the swarm from
+    // stacking while still choosing a different repair point every cycle.
     const repairTime=deployAge-drone.deployDuration;
-    const settledTime=Math.max(0,repairTime-drone.settleDuration),cycleDuration=THREE.MathUtils.clamp(3.08+(drone.orbitRadius||1.4)*.38,3.55,4.65),cycleIndex=Math.floor(settledTime/cycleDuration),cycle=(settledTime%cycleDuration)/cycleDuration;
-    const travelFraction=.7,arcStep=Math.PI*2/3,formationAngle=index*Math.PI*.5;
-    const previousAngle=formationAngle+cycleIndex*arcStep;
-    const nextAngle=previousAngle+arcStep;
-    const moveProgress=THREE.MathUtils.smootherstep(Math.min(1,cycle/travelFraction),0,1);
-    // Deterministic pseudo-random values make every pass different without
-    // introducing frame-to-frame noise or shaking.
-    const routeSeed=(cycleIndex+1)*12.9898+(index+1)*78.233;
-    const sideRandom=Math.sin(routeSeed*1.17);
-    const radialRandom=Math.sin(routeSeed*2.31+.7);
-    const heightRandom=Math.sin(routeSeed*3.73+1.9);
-    const travelArc=Math.sin(moveProgress*Math.PI);
-    // One wide lateral bow per route looks deliberate and keeps velocity
-    // continuous. The following cycle can bow to the opposite side.
-    const sideWeave=travelArc*(.2+Math.abs(sideRandom)*.44)*Math.sign(sideRandom||1);
-    const angle=THREE.MathUtils.lerp(previousAngle,nextAngle,moveProgress)+sideWeave;
-    const baseRadius=drone.orbitRadius||THREE.MathUtils.clamp(.9+enemy.type.scale*.62,1.2,2.2);
-    const previousRadius=baseRadius+Math.sin(cycleIndex*2.17+index*1.3)*.16;
-    const nextRadius=baseRadius+Math.sin((cycleIndex+1)*2.17+index*1.3)*.16;
-    const radialExcursion=radialRandom<0?radialRandom*.18:radialRandom*Math.min(.52,baseRadius*.24);
-    const radius=Math.max(drone.orbitMinRadius||.86,THREE.MathUtils.lerp(previousRadius,nextRadius,moveProgress)+travelArc*radialExcursion);
-    const previousHeight=.08+.84*(.5+.5*Math.sin(cycleIndex*1.73+index*1.57));
-    const nextHeight=.08+.84*(.5+.5*Math.sin((cycleIndex+1)*1.73+index*1.57));
-    enemyRandomRepairSectionPosition(enemy,index,cycleIndex,repairDroneAnchor);
-    const orbitCenter=drone.orbitCenter||repairDroneAnchor;
-    const routeHeight=THREE.MathUtils.clamp(THREE.MathUtils.lerp(previousHeight,nextHeight,moveProgress)+travelArc*heightRandom*.3,0,1);
-    const flightY=THREE.MathUtils.lerp(drone.orbitMinY??.34,drone.orbitMaxY??1.2,routeHeight);
-    repairDroneCurveA.set(
-      orbitCenter.x+Math.cos(angle)*radius,
-      flightY,
-      orbitCenter.z+Math.sin(angle)*radius
-    );
+    const settledTime=Math.max(0,repairTime-drone.settleDuration),indexOffset=index*.31,cycleDuration=3.35,shiftedTime=settledTime+indexOffset,cycleIndex=Math.floor(shiftedTime/cycleDuration),cycle=(shiftedTime%cycleDuration)/cycleDuration;
+    const sector=index*Math.PI*.5;
+    const previousJitter=Math.sin((cycleIndex-1)*12.9898+index*7.31)*.62;
+    const nextJitter=Math.sin(cycleIndex*12.9898+index*7.31)*.62;
+    const previousRadius=1.02+.48*(.5+.5*Math.sin((cycleIndex-1)*5.17+index));
+    const nextRadius=1.02+.48*(.5+.5*Math.sin(cycleIndex*5.17+index));
+    const moveProgress=THREE.MathUtils.smootherstep(Math.min(1,cycle/.58),0,1);
+    const angle=THREE.MathUtils.lerp(sector+previousJitter,sector+nextJitter,moveProgress);
+    const radius=THREE.MathUtils.lerp(previousRadius,nextRadius,moveProgress);
+    const previousHeight=.24+.52*(.5+.5*Math.sin((cycleIndex-1)*4.23+index*2.1));
+    const nextHeight=.24+.52*(.5+.5*Math.sin(cycleIndex*4.23+index*2.1));
+    repairDroneCurveA.set(enemy.group.position.x+Math.cos(angle)*radius,centerY+THREE.MathUtils.lerp(previousHeight,nextHeight,moveProgress),enemy.group.position.z+Math.sin(angle)*radius);
     if(repairTime<drone.settleDuration){
       const settleProgress=THREE.MathUtils.smootherstep(repairTime/drone.settleDuration,0,1);
       drone.group.position.copy(drone.deployTarget).lerp(repairDroneCurveA,settleProgress);
-    }else{
-      // Low-pass the procedural destination so animation remains fluid during
-      // frame-rate drops and at the boundary between travel and welding.
-      const flightSmoothing=1-Math.exp(-delta*7.5);
-      drone.group.position.lerp(repairDroneCurveA,flightSmoothing);
-    }
-    enemyRepairSurfacePosition(enemy,drone.group.position,repairDroneAnchor,repairDroneTarget);
-    drone.contactTarget.lerp(repairDroneTarget,1-Math.exp(-delta*18));
-    repairDroneTarget.copy(drone.contactTarget);
+    }else drone.group.position.copy(repairDroneCurveA);
+    const contactAngle=index*Math.PI*.5+Math.sin(elapsed*.72+index)*.14,contactRadius=Math.max(.22,enemy.type.scale*.26);
+    repairDroneTarget.set(enemy.group.position.x+Math.cos(contactAngle)*contactRadius,centerY-.16+(index%2)*.18,enemy.group.position.z+Math.sin(contactAngle)*contactRadius);
     const targetYaw=Math.atan2(repairDroneTarget.x-drone.group.position.x,repairDroneTarget.z-drone.group.position.z);
     const yawDifference=Math.atan2(Math.sin(targetYaw-drone.group.rotation.y),Math.cos(targetYaw-drone.group.rotation.y));
-    drone.group.rotation.y+=yawDifference*(1-Math.exp(-delta*7));
-    const flightBank=cycle<travelFraction?THREE.MathUtils.clamp(sideWeave*.24+radialRandom*travelArc*.11,-.2,.2):0;
-    drone.group.rotation.z=THREE.MathUtils.lerp(drone.group.rotation.z,flightBank,1-Math.exp(-delta*5.5));
+    drone.group.rotation.y+=yawDifference*Math.min(1,delta*8);
+    drone.group.rotation.z=THREE.MathUtils.lerp(drone.group.rotation.z,Math.sin(elapsed*5+index)*.045*(cycle<.52?1:0),Math.min(1,delta*8));
     drone.previousFlightPosition.copy(drone.group.position);
     drone.rotors.forEach((rotor,rotorIndex)=>{rotor.rotation.y+=delta*(rotorIndex?19:-19);});
-    const stopped=repairTime>=drone.settleDuration&&cycle>=travelFraction,laserPulse=stopped?Math.max(0,Math.sin((cycle-travelFraction)/(1-travelFraction)*Math.PI*8)):0;
+    const stopped=repairTime>=drone.settleDuration&&cycle>=.58,laserPulse=stopped?Math.max(0,Math.sin((cycle-.58)/.42*Math.PI*10)):0;
     repairDroneBeamDirection.subVectors(repairDroneTarget,drone.group.position);
     const beamLength=repairDroneBeamDirection.length();
     drone.beam.position.copy(drone.group.position).lerp(repairDroneTarget,.5);
@@ -3884,12 +3649,10 @@ function damageTamedEnemy(enemy, amount, source) {
   if(enemy.health<=0){
     enemy.tamedRepairStartedAt=clock.elapsedTime;
     enemy.tamedStunnedUntil=enemy.tamedRepairStartedAt+20;
-    enemy.group.rotation.z=(enemy.typeId===1||enemy.typeId===2)?0:1.15; enemy.steering.set(0,0,0);
-    if(enemy.typeId===2){const stunnedDuration=getEnemyDefinition(2).animations.stunnedDuration||2.2;applyEnemyPose(enemy,{elapsed:clock.elapsedTime,stunnedProgress:0});}
-    enemy.group.updateMatrixWorld(true);
     createCompanionRepairDrones(enemy);
     if(enemy.typeId===1){playEnemySound(enemy,"stunned");enemy.nextCrawlerStunnedSound=clock.elapsedTime+1.05;}
     if(enemy.typeId===1&&enemy.burrowState){enemy.burrowState=null;enemy.group.visible=true;enemy.group.position.y=0;removeScrapBurrowMarker(enemy);}
+    enemy.group.rotation.z=enemy.typeId===1?0:1.15; enemy.steering.set(0,0,0);
     worldTone(enemy.group,175,.32,.09,"sawtooth");worldTone(enemy.group,88,.45,.075,"square",sfxBus,.12);
     speakSquadAlert(`${enemy.type.name} is down. Repairs are underway.`);
     statusEl.textContent=`${enemy.type.name} downed - repairing for 20 seconds`;
@@ -3926,8 +3689,7 @@ function moveCompanionToward(enemy, target, delta, stopDistance) {
   const dx=travelTarget.x-enemy.group.position.x,dz=travelTarget.z-enemy.group.position.z;
   const distance=Math.max(.01,Math.hypot(dx,dz));
   const elapsed=clock.elapsedTime;
-  const movementLocked=elapsed<(enemy.stunnedUntil||0)||elapsed<(enemy.rootedUntil||0);
-  const abilitySpeed=movementLocked?0:elapsed<(enemy.chargeUntil||0)?2.5:elapsed<(enemy.speedBoostUntil||0)?1.45:1;
+  const abilitySpeed=elapsed<(enemy.chargeUntil||0)?2.5:elapsed<(enemy.speedBoostUntil||0)?1.45:elapsed<(enemy.stunnedUntil||0)?0:1;
   const desiredSpeed=distance>(crossing ? .2 : stopDistance)?enemy.speed*1.08*abilitySpeed:0;
   enemy.steering.x=THREE.MathUtils.damp(enemy.steering.x,dx/distance*desiredSpeed,6,delta);
   enemy.steering.z=THREE.MathUtils.damp(enemy.steering.z,dz/distance*desiredSpeed,6,delta);
@@ -3950,15 +3712,11 @@ function updateTamedEnemy(enemy, delta, elapsed) {
     updateCrawlerStunnedSound(enemy,elapsed);
     const repairProgress=THREE.MathUtils.clamp((elapsed-(enemy.tamedRepairStartedAt??elapsed))/20,0,1);
     enemy.health=enemy.maxHealth*repairProgress;
-    if(enemy.typeId===1||enemy.typeId===2){const stunnedDuration=getEnemyDefinition(enemy.typeId).animations.stunnedDuration||2.2;applyEnemyPose(enemy,{elapsed,stunnedProgress:(elapsed%stunnedDuration)/stunnedDuration});}
-    enemy.bodyMaterial.emissiveIntensity=.2+Math.sin(elapsed*8)*.08+repairProgress*.18;
-    if(enemy.typeId===1){enemy.group.rotation.z=Math.sin(elapsed*7)*.012;enemy.group.position.y=Math.sin(elapsed*5)*.025;}
-    else if(enemy.typeId!==2){enemy.group.rotation.z=1.15+Math.sin(elapsed*7)*.025;enemy.group.position.y=(enemy.flying?.25:0)+Math.sin(elapsed*5)*.025;}
-    keepEnemyAboveArenaFloor(enemy);
-    // Update the complete stunned pose before resolving animated anchors and
-    // body-surface raycasts, eliminating the previous one-frame beam lag.
-    enemy.group.updateMatrixWorld(true);
     updateCompanionRepairDrones(enemy,delta,elapsed,repairProgress);
+    if(enemy.typeId===1){const stunnedDuration=getEnemyDefinition(1).animations.stunnedDuration||2.2;applyEnemyPose(enemy,{elapsed,stunnedProgress:(elapsed%stunnedDuration)/stunnedDuration});}
+    enemy.bodyMaterial.emissiveIntensity=.2+Math.sin(elapsed*8)*.08+repairProgress*.18;
+    enemy.group.rotation.z=enemy.typeId===1?Math.sin(elapsed*7)*.012:1.15+Math.sin(elapsed*7)*.025;
+    enemy.group.position.y=(enemy.flying? .25:0)+Math.sin(elapsed*5)*.025;
     return;
   }
   if(enemy.tamedRepairStartedAt!=null){
@@ -3986,12 +3744,7 @@ function updateTamedEnemy(enemy, delta, elapsed) {
       const end=target.group.position.clone();end.y+=Math.max(.6,target.type.scale);
       createTracer(start,end,TAMED_ABILITY_COLOR);target.aggroTarget=enemy;target.aggroUntil=elapsed+6;damageEnemy(target,Math.max(4,Math.round(enemy.damage*.55)),"body");
       enemy.burstShots-=1;enemy.burstAt=elapsed+(enemy.typeId===15?.14:.25);
-      if(enemy.burstShots===0&&enemy.crashAfterBurst){
-        // Compatibility cleanup for an E02 spawned before Barrage was changed
-        // from a false stun to a rooted firing recovery.
-        enemy.rootedUntil=Math.max(enemy.rootedUntil||0,elapsed+.35);
-        enemy.crashAfterBurst=false;
-      }
+      if(enemy.burstShots===0&&enemy.crashAfterBurst){enemy.stunnedUntil=elapsed+1.8;enemy.crashAfterBurst=false;}
     }
     if(elapsed>=enemy.abilityAt)activateSignatureAbility(enemy,elapsed,nearest.distance,target);
     if(enemy.typeId===1&&enemy.burrowState){updateScrapCrawlerBurrow(enemy,delta,elapsed);return;}
@@ -4021,13 +3774,12 @@ function updateTamedEnemy(enemy, delta, elapsed) {
 
 function updateCapturableEnemy(enemy, delta, elapsed) {
   enemy.captureTimeRemaining=Math.max(0,(enemy.captureTimeRemaining??CAPTURABLE_LIFETIME)-delta);
-  if(enemy.typeId===1||enemy.typeId===2){
+  if(enemy.typeId===1){
     updateCrawlerStunnedSound(enemy,elapsed);
-    const stunnedDuration=getEnemyDefinition(enemy.typeId).animations.stunnedDuration||2.2;
+    const stunnedDuration=getEnemyDefinition(1).animations.stunnedDuration||2.2;
     applyEnemyPose(enemy,{elapsed,stunnedProgress:(elapsed%stunnedDuration)/stunnedDuration});
-    if(enemy.typeId===1)enemy.group.rotation.z=Math.sin(elapsed*8)*.012;
+    enemy.group.rotation.z=Math.sin(elapsed*8)*.012;
   }else enemy.group.rotation.z=THREE.MathUtils.damp(enemy.group.rotation.z,.92,5,delta);
-  keepEnemyAboveArenaFloor(enemy);
   if(enemy.captureMarker){
     enemy.captureMarker.rotation.z+=delta*2.2;
     const pulse=1+Math.sin(elapsed*5+enemy.seed)*.12;
@@ -4103,8 +3855,7 @@ function updateEnemies(delta, elapsed) {
       enemy.burstShots -= 1;
       enemy.burstAt = elapsed + (enemy.typeId === 15 ? .14 : .25);
       if (enemy.burstShots === 0 && enemy.crashAfterBurst) {
-        // Do not invoke the shared stunned/knockdown pose after E02's Barrage.
-        enemy.rootedUntil = Math.max(enemy.rootedUntil || 0, elapsed + .35);
+        enemy.stunnedUntil = elapsed + 1.8;
         enemy.crashAfterBurst = false;
       }
     }
@@ -4121,8 +3872,7 @@ function updateEnemies(delta, elapsed) {
     if (moveSign > 0 && (hasSight || companionTarget)) navDirection.set(dirX, 0, dirZ);
     else if (moveSign > 0) getWaypointDirection(enemy, navDirection);
     else navDirection.set(0, 0, 0);
-    const movementLocked=elapsed<(enemy.stunnedUntil||0)||elapsed<(enemy.rootedUntil||0);
-    const abilitySpeed = movementLocked ? 0 : elapsed < (enemy.chargeUntil || 0) ? 2.5 : elapsed < (enemy.speedBoostUntil || 0) ? 1.45 : 1;
+    const abilitySpeed = elapsed < (enemy.chargeUntil || 0) ? 2.5 : elapsed < (enemy.speedBoostUntil || 0) ? 1.45 : elapsed < (enemy.stunnedUntil || 0) ? 0 : 1;
     const stepX = navDirection.x * enemy.speed * abilitySpeed * moveSign;
     const stepZ = navDirection.z * enemy.speed * abilitySpeed * moveSign;
     enemy.steering.x = THREE.MathUtils.damp(enemy.steering.x, stepX, 5, delta);

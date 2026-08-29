@@ -120,34 +120,7 @@ export function applyEnemySkillPose(actor,definition,time,duration,{previewMotio
   else if(motion==="phase"){if(previewMotion){actor.group.visible=!(p>.32&&p<.55);if(p>=.55)actor.group.position.z+=8.55;actor.group.position.x+=Math.sin(p*Math.PI*2)*.45;}parts.rings.forEach((part,index)=>part.rotation[index%2?"z":"y"]+=time*5);}
   else if(motion==="stomp"){if(previewMotion)actor.group.position.y+=Math.sin(Math.min(1,p*2)*Math.PI)*.45;if(parts.body)parts.body.rotation.x-=arc*.18;parts.rings.forEach((part)=>part.scale.multiplyScalar(1+p*8));}
   else if(motion==="core"){parts.rings.forEach((part,index)=>{part.rotation.x+=time*(1+index);part.rotation.y+=time*(1.4+index);part.scale.multiplyScalar(1+arc*.18);});parts.glows.forEach((part)=>part.scale.multiplyScalar(1+arc*.25));}
-  else if(motion==="rangedBurst"&&definition.id===2){
-    const rig=parts.brokenDrone,spinUp=THREE.MathUtils.smootherstep(p,0,.2),recovery=THREE.MathUtils.smootherstep(p,.78,1),firing=spinUp*(1-recovery);
-    const volley=THREE.MathUtils.clamp((p-.18)/.58,0,.9999)*4,shotIndex=Math.floor(volley),shotProgress=volley-shotIndex;
-    const recoil=Math.sin(THREE.MathUtils.clamp(shotProgress/.72,0,1)*Math.PI)*firing;
-    actor.group.rotation.x-=spinUp*.09-recovery*.09;
-    actor.group.rotation.z+=Math.sin(time*21)*firing*.045+Math.sin(p*Math.PI)*.055;
-    if(parts.body){parts.body.position.z-=recoil*.055;parts.body.rotation.x-=recoil*.045;}
-    if(parts.head){parts.head.position.z-=recoil*.1;parts.head.rotation.x+=recoil*.08;}
-    parts.weapons.forEach((barrel,index)=>{
-      const active=index===shotIndex%Math.max(1,parts.weapons.length)?1:.16;
-      barrel.position.copy(barrel.userData.basePosition);barrel.rotation.copy(barrel.userData.baseRotation);
-      barrel.position.z-=recoil*(.2*active+.025);barrel.rotation.x+=(index-1)*recoil*.035;
-    });
-    parts.glows.forEach((light,index)=>light.scale.multiplyScalar(1+firing*(.12+Math.max(0,Math.sin(time*18-index))*.18)));
-    if(rig){
-      rig.workingRotor.rotation.y+=time*(20+spinUp*22);
-      rig.intactWing.rotation.z-=spinUp*.045+recoil*.035;
-      rig.brokenHub.rotation.z+=Math.sin(time*27)*firing*.11;
-      rig.brokenBladeUpper.rotation.z+=Math.sin(time*31)*firing*.13;
-      rig.brokenBladeLower.rotation.x-=Math.sin(time*25)*firing*.1;
-      rig.hangingCable.rotation.z+=Math.sin(time*16)*firing*.14;
-      rig.loosePlate.rotation.x+=Math.sin(time*29)*firing*.1;
-      rig.workingThruster.scale.z*=1+spinUp*.38+recoil*.24;
-      rig.reactor.rotation.y+=time*(3+spinUp*8);rig.reactorRing.rotation.y+=time*(5+spinUp*12);
-      rig.eye.scale.multiplyScalar(1+spinUp*.22+recoil*.32);rig.faultLight.visible=Math.sin(time*28)>.05;
-    }
-  }
-  else if(["rangedBurst","sniper","barrage","bombardment"].includes(motion)){parts.weapons.forEach((part,index)=>{part.position.z-=Math.abs(Math.sin(time*(motion==="barrage"?16:7)+index))*.18;});parts.weaponRotors?.forEach((part,index)=>{part.rotation.y+=(index%2?-1:1)*time*24;});actor.group.rotation.z+=Math.sin(time*18)*arc*.025;}
+  else if(["rangedBurst","sniper","barrage","bombardment"].includes(motion)){parts.weapons.forEach((part,index)=>{part.position.z-=Math.abs(Math.sin(time*(motion==="barrage"?16:7)+index))*.18;});actor.group.rotation.z+=Math.sin(time*18)*arc*.025;}
   else if(["pulse","deploy","gravityOrb"].includes(motion)){parts.rings.forEach((part,index)=>{part.rotation[index%2?"z":"y"]+=time*4;part.scale.multiplyScalar(motion==="pulse"?1+p*6:1+arc*.35);});parts.glows.forEach((part)=>part.scale.multiplyScalar(1+arc*.3));}
   else if(motion==="flameWall")parts.weapons.forEach((part)=>{part.rotation.y+=Math.sin(p*Math.PI*2)*.5;part.scale.z*=1+arc*.3;});
   else if(motion==="selfPulse"){if(previewMotion&&actor.groupScale)actor.group.scale.copy(actor.groupScale).multiplyScalar(1+arc*.16);parts.glows.forEach((part)=>part.scale.multiplyScalar(1+arc*.4));}
