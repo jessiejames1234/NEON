@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
         CHECK (length(email) BETWEEN 3 AND 254),
     password_hash TEXT NOT NULL,
     password_salt TEXT NOT NULL,
-    password_iterations INTEGER NOT NULL DEFAULT 210000,
+    password_iterations INTEGER NOT NULL DEFAULT 100000,
     password_algorithm TEXT NOT NULL DEFAULT 'PBKDF2-SHA256',
     role TEXT NOT NULL DEFAULT 'player'
         CHECK (role IN ('player', 'admin', 'owner')),

@@ -1,4 +1,5 @@
-const PBKDF2_ITERATIONS = 210_000;
+// Cloudflare Workers Web Crypto currently caps PBKDF2 at 100,000 rounds.
+const PBKDF2_ITERATIONS = 100_000;
 const PASSWORD_HASH_BYTES = 32;
 
 const RESPONSE_HEADERS = {
@@ -89,12 +90,12 @@ export async function onRequestPost({ request, env }) {
 
   // Role and status deliberately do not come from the request. Public users
   // must never be able to register themselves as an administrator or owner.
-  const role = "player";
-  const status = "active";
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const passwordHash = await hashPassword(password, salt);
-
   try {
+    const role = "player";
+    const status = "active";
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const passwordHash = await hashPassword(password, salt);
+
     const result = await env.LEADERBOARD_DB
       .prepare(`
         INSERT INTO users (

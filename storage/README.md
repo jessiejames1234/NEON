@@ -124,7 +124,7 @@ The `users` table contains:
 - `role` — `player`, `admin`, or `owner`
 - `status` — `active` or `inactive`
 
-Passwords are processed with salted PBKDF2-SHA256 using Cloudflare Workers Web Crypto and are never stored or returned as plain text.
+Passwords are processed with a unique salt and PBKDF2-SHA256 using Cloudflare Workers Web Crypto's supported maximum of 100,000 iterations. Plain-text passwords are never stored or returned.
 
 Public registration always creates an `active` account with the `player` role. The endpoint intentionally ignores any requested role or status so users cannot make themselves an administrator or owner.
 
