@@ -1,6 +1,6 @@
 # Neon Outpost D1 Leaderboard
 
-This folder is a staging area for the shared online leaderboard and user accounts. Nothing outside `storage/` has been changed, and the game does not call these APIs yet.
+This folder keeps the source reference, schema, and setup guide for the shared online leaderboard and user accounts. Deployable copies of both APIs now exist in the repository-root `functions/api/` directory.
 
 ## Files
 
@@ -30,34 +30,25 @@ Add a **D1 database** binding with:
 
 Save the binding.
 
-## 3. Activate the API later
+## 3. Deploy the API
 
-Cloudflare Pages only discovers Functions from a `/functions` directory at the repository root. The Function is deliberately inside `storage/functions/` for now because this task is limited to the new storage folder.
-
-When leaderboard integration is approved, move or copy:
-
-```text
-storage/functions/api/leaderboard.js
-storage/functions/api/register.js
-```
-
-to:
+Cloudflare Pages discovers Functions from the `/functions` directory at the repository root. Deployable copies are already present at:
 
 ```text
 functions/api/leaderboard.js
 functions/api/register.js
 ```
 
-Commit and push that root `functions/` directory to GitHub. Cloudflare will redeploy the Pages project and create this endpoint:
+Commit and push the root `functions/` directory to GitHub. Cloudflare will redeploy the Pages project and create this endpoint:
 
 ```text
-https://YOUR-PROJECT.pages.dev/api/leaderboard
+https://neon-outpost-by-jesce.pages.dev/api/leaderboard
 ```
 
 The registration endpoint will be:
 
 ```text
-https://YOUR-PROJECT.pages.dev/api/register
+https://neon-outpost-by-jesce.pages.dev/api/register
 ```
 
 ## 4. API behavior
@@ -105,7 +96,7 @@ Each case-insensitive player name keeps only its highest score. Names are limite
 Open this URL in a browser:
 
 ```text
-https://YOUR-PROJECT.pages.dev/api/leaderboard
+https://neon-outpost-by-jesce.pages.dev/api/leaderboard
 ```
 
 A working empty leaderboard returns:
@@ -118,7 +109,7 @@ PowerShell submission test:
 
 ```powershell
 $body = @{ name = "Test Player"; score = 1200; wave = 5; kills = 20 } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "https://YOUR-PROJECT.pages.dev/api/leaderboard" -ContentType "application/json" -Body $body
+Invoke-RestMethod -Method Post -Uri "https://neon-outpost-by-jesce.pages.dev/api/leaderboard" -ContentType "application/json" -Body $body
 ```
 
 ## User accounts
@@ -154,7 +145,7 @@ PowerShell registration test after deployment:
 
 ```powershell
 $account = @{ username = "TestPlayer"; email = "test@example.com"; password = "TestPassword123!" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "https://YOUR-PROJECT.pages.dev/api/register" -ContentType "application/json" -Body $account
+Invoke-RestMethod -Method Post -Uri "https://neon-outpost-by-jesce.pages.dev/api/register" -ContentType "application/json" -Body $account
 ```
 
 This creates accounts only. Login sessions, email verification, password reset, and administrator account management still need separate endpoints before authentication is production-ready.
