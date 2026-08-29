@@ -9,7 +9,7 @@ import {
   ENEMY_DEFINITIONS,getEnemyDefinition,
 } from "./enemy/index.js";
 import {createAbilityVisual,advanceAbilityVisual,disposeAbilityVisual,indicatorColor} from "./enemy/ability-visuals.js";
-import {applyEnemyPose,applyEnemyDeathPose,applyCrawlerMalfunctionEffects} from "./enemy/animation-runtime.js";
+import {applyEnemyPose,applyEnemyDeathPose,applyCrawlerMalfunctionEffects,setEnemyEffectQuality} from "./enemy/animation-runtime.js";
 import {applyEnemySkillPose,captureEnemySkillPose,getScrapBurrowGroundPosition,getScrapBurrowPhase} from "./enemy/skill-presentation.js";
 
 const PLAYER = Object.freeze({ eyeHeight: 1.7, radius: 0.36, walk: 5.6, sprint: 9, jump: 7.2, maxHealth: 100 });
@@ -40,6 +40,8 @@ const errorScreen = document.querySelector("#error");
 const hud = document.querySelector("#hud");
 const scoreEl = document.querySelector("#score");
 const totalEl = document.querySelector("#total");
+const runPointsEl = document.querySelector("#run-points");
+const pointsPopupsEl = document.querySelector("#points-popups");
 const statusEl = document.querySelector("#status");
 const speedLines = document.querySelector("#speed-lines");
 const ammoEl = document.querySelector("#ammo");
@@ -91,6 +93,16 @@ if(nanoShieldImpactEl){
 const godModeIndicatorEl = document.querySelector("#god-mode-indicator");
 const godModeButtonEl = document.querySelector("#god-mode-button");
 const godModeStateEl = document.querySelector("#god-mode-state");
+const noClipButtonEl = document.querySelector("#no-clip-button");
+const noClipStateEl = document.querySelector("#no-clip-state");
+const noReloadButtonEl = document.querySelector("#no-reload-button");
+const noReloadStateEl = document.querySelector("#no-reload-state");
+const godSpeedButtonEl = document.querySelector("#god-speed-button");
+const godSpeedStateEl = document.querySelector("#god-speed-state");
+const oneHitButtonEl = document.querySelector("#one-hit-button");
+const oneHitStateEl = document.querySelector("#one-hit-state");
+const tamedGodButtonEl = document.querySelector("#tamed-god-button");
+const tamedGodStateEl = document.querySelector("#tamed-god-state");
 const waveSelectEl = document.querySelector("#wave-select");
 const changeWaveButtonEl = document.querySelector("#change-wave-button");
 const squadPanelEl = document.querySelector("#squad-panel");
@@ -105,6 +117,19 @@ const volumePercentageEl = document.querySelector("#volume-percentage");
 const volumeRangeEl = document.querySelector("#volume-range");
 const voiceButtonEl = document.querySelector("#voice-button");
 const voiceStateEl = document.querySelector("#voice-state");
+const graphicsSelectEl = document.querySelector("#graphics-select");
+const graphicsEffectiveEl = document.querySelector("#graphics-effective");
+const graphicsDetailsEl = document.querySelector("#graphics-details");
+const performanceFpsEl = document.querySelector("#performance-fps");
+const performancePingEl = document.querySelector("#performance-ping");
+const performanceNetworkEl = document.querySelector("#performance-network");
+const settingsFpsEl = document.querySelector("#settings-fps");
+const settingsPingEl = document.querySelector("#settings-ping");
+const settingsNetworkEl = document.querySelector("#settings-network");
+const menuSecondaryEl = document.querySelector("#menu-secondary");
+const settingsButtonEl = document.querySelector("#settings-button");
+const settingsCloseButtonEl = document.querySelector("#settings-close-button");
+const refreshPingButtonEl = document.querySelector("#refresh-ping-button");
 const resultLabelEl = document.querySelector("#result-label");
 const resultTitleEl = document.querySelector("#result-title");
 const resultCopyEl = document.querySelector("#result-copy");
@@ -132,18 +157,57 @@ const isMobileDevice = navigator.maxTouchPoints > 0 && window.matchMedia("(point
 const mobileLandscapeQuery = window.matchMedia("(orientation: landscape)");
 document.body.classList.toggle("mobile-device", isMobileDevice);
 
+const GRAPHICS_STORAGE_KEY="neon-outpost-graphics-v1";
+const GRAPHICS_ORDER=["very-low","low","medium","high","very-high"];
+const GRAPHICS_PRESETS=Object.freeze({
+  "very-low":{label:"VERY LOW",pixelRatio:.5,particles:.15,anisotropy:1,cameraFar:45,skyline:.22,modelDetail:.35,animationNearStride:2,animationFarStride:4,animationFarDistance:10,visibilityInterval:.34,abilityVisualStride:2,effectDensity:.25,repairDrones:1,toneMapping:false},
+  low:{label:"LOW",pixelRatio:.65,particles:.32,anisotropy:2,cameraFar:55,skyline:.45,modelDetail:.52,animationNearStride:1,animationFarStride:3,animationFarDistance:12,visibilityInterval:.25,abilityVisualStride:2,effectDensity:.45,repairDrones:2,toneMapping:false},
+  medium:{label:"MEDIUM",pixelRatio:.82,particles:.58,anisotropy:4,cameraFar:68,skyline:.72,modelDetail:.72,animationNearStride:1,animationFarStride:2,animationFarDistance:16,visibilityInterval:.16,abilityVisualStride:1,effectDensity:.7,repairDrones:3,toneMapping:true},
+  high:{label:"HIGH",pixelRatio:1,particles:.82,anisotropy:8,cameraFar:80,skyline:1,modelDetail:1,animationNearStride:1,animationFarStride:1,animationFarDistance:20,visibilityInterval:.1,abilityVisualStride:1,effectDensity:1,repairDrones:4,toneMapping:true},
+  "very-high":{label:"VERY HIGH",pixelRatio:1.35,particles:1,anisotropy:16,cameraFar:95,skyline:1,modelDetail:1,animationNearStride:1,animationFarStride:1,animationFarDistance:24,visibilityInterval:.075,abilityVisualStride:1,effectDensity:1,repairDrones:4,toneMapping:true},
+});
+
+function readGraphicsPreference(){
+  try{
+    const value=localStorage.getItem(GRAPHICS_STORAGE_KEY);
+    return value==="auto"||GRAPHICS_PRESETS[value]?value:"auto";
+  }catch{return "auto";}
+}
+
+function detectGraphicsPreset(){
+  const memory=Number(navigator.deviceMemory)||0;
+  const cores=Number(navigator.hardwareConcurrency)||0;
+  const displayPixels=window.innerWidth*window.innerHeight*Math.min(window.devicePixelRatio||1,2)**2;
+  let score=isMobileDevice?0:2;
+  if(memory){if(memory<=2)score-=2;else if(memory<=4)score-=1;else if(memory>=8)score+=1;}
+  if(cores){if(cores<=2)score-=2;else if(cores<=4)score-=1;else if(cores>=8)score+=1;}
+  if(displayPixels>5000000)score-=1;
+  if(score<=-2)return "very-low";
+  if(score<=0)return "low";
+  if(score<=2)return "medium";
+  if(score<=4)return "high";
+  return "very-high";
+}
+
+let graphicsMode=readGraphicsPreference();
+let activeGraphicsPreset=graphicsMode==="auto"?detectGraphicsPreset():graphicsMode;
+let worldParticles=null;
+
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ antialias: window.devicePixelRatio <= 1.25, powerPreference: "high-performance" });
+  renderer = new THREE.WebGLRenderer({
+    antialias:!['very-low','low'].includes(activeGraphicsPreset)&&(window.devicePixelRatio||1)<=1.5,
+    powerPreference:"high-performance",
+  });
 } catch (error) {
   console.error(error);
   errorScreen.classList.remove("hidden");
   throw error;
 }
 
-let renderScale = Math.min(window.devicePixelRatio, 1);
+let renderScale = Math.min(window.devicePixelRatio,GRAPHICS_PRESETS[activeGraphicsPreset].pixelRatio);
 renderer.setPixelRatio(renderScale);
-setEnemyModelAnisotropy(renderer.capabilities.getMaxAnisotropy());
+setEnemyModelAnisotropy(Math.min(GRAPHICS_PRESETS[activeGraphicsPreset].anisotropy,renderer.capabilities.getMaxAnisotropy()));
 renderer.setSize(window.innerWidth, window.innerHeight);
 // Dynamic shadows multiplied every detailed enemy into another render pass.
 // Baked-looking directional lighting and emissive accents keep the scene readable
@@ -178,7 +242,7 @@ const clock = new THREE.Clock();
 let qualityTime = 0;
 let qualityFrames = 0;
 let qualityRecoverySamples=0;
-let performanceMode=false;
+let qualityLowSamples=0;
 let renderFrame=0;
 const keys = new Set();
 const obstacles = [];
@@ -233,6 +297,11 @@ let sprintDisabledUntil = 0;
 let squadMode = "attack";
 let squadUiAt = 0;
 let godMode = false;
+let noClipMode = false;
+let noReloadMode = false;
+let godSpeedMode = false;
+let oneHitMode = false;
+let tamedGodMode = false;
 let currentWave = 0;
 let runPoints = 0;
 let runKills = 0;
@@ -249,7 +318,8 @@ const spawnPoints = [
 ];
 const spawnGates=[];
 
-scene.add(new THREE.HemisphereLight(0x8ecbd3, 0x10151a, 1.35));
+const hemisphereLight=new THREE.HemisphereLight(0x8ecbd3,0x10151a,1.35);
+scene.add(hemisphereLight);
 
 const moonLight = new THREE.DirectionalLight(0xd5faff, 2.4);
 moonLight.position.set(-14, 24, 8);
@@ -797,13 +867,15 @@ function updateSpawnGates(delta,elapsed){
   }
 }
 
-// Distant skyline silhouettes.
+// Distant skyline silhouettes. Presets can hide a stable percentage of these
+// cosmetic meshes without changing any collision or playable area.
+const skylineDecorations=[];
 for (let i = 0; i < 18; i += 1) {
   const angle = (i / 32) * Math.PI * 2;
   const radius = 37 + Math.random() * 10;
   const height = 4 + Math.random() * 14;
-  addBox(Math.cos(angle) * radius, height / 2 - .5, Math.sin(angle) * radius,
-    2 + Math.random() * 5, height, 2 + Math.random() * 5, 0x0d181e, false);
+  skylineDecorations.push(addBox(Math.cos(angle) * radius, height / 2 - .5, Math.sin(angle) * radius,
+    2 + Math.random() * 5, height, 2 + Math.random() * 5, 0x0d181e, false));
 }
 
 // Star-like dust particles.
@@ -821,9 +893,73 @@ for (let i = 0; i < particleCount; i += 1) {
 }
 const particlesGeometry = new THREE.BufferGeometry();
 particlesGeometry.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
-scene.add(new THREE.Points(particlesGeometry, new THREE.PointsMaterial({
+worldParticles=new THREE.Points(particlesGeometry, new THREE.PointsMaterial({
   color: 0x8edfd5, size: .045, transparent: true, opacity: .55,
-})));
+}));
+scene.add(worldParticles);
+
+function updateGraphicsReadout(fps=0){
+  const preset=GRAPHICS_PRESETS[activeGraphicsPreset];
+  if(graphicsEffectiveEl)graphicsEffectiveEl.textContent=graphicsMode==="auto"
+    ?`AUTO // ${preset.label}`
+    :preset.label;
+  if(graphicsDetailsEl){
+    const dust=Math.max(0,Math.round(particleCount*preset.particles));
+    const fpsCopy=fps>0?` // ${Math.round(fps)} FPS`:"";
+    graphicsDetailsEl.textContent=`${renderScale.toFixed(2)}X RENDER // ${dust} PARTICLES // ${preset.repairDrones} REPAIR DRONES${fpsCopy}${graphicsMode==="auto"?" // LIVE TUNING":" // MANUAL LOCK"}`;
+  }
+}
+
+function applyEnemyGraphicsDetail(enemy){
+  const preset=GRAPHICS_PRESETS[activeGraphicsPreset];
+  const rings=enemy?.parts?.rings||[];
+  const visibleRings=Math.ceil(rings.length*preset.modelDetail);
+  rings.forEach((ring,index)=>{ring.visible=index<visibleRings;});
+}
+
+function applyGraphicsPreset(presetName,{resetSamples=true}={}){
+  if(!GRAPHICS_PRESETS[presetName])return;
+  activeGraphicsPreset=presetName;
+  const preset=GRAPHICS_PRESETS[presetName];
+  renderScale=Math.min(window.devicePixelRatio||1,preset.pixelRatio);
+  renderer.setPixelRatio(renderScale);
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  setEnemyModelAnisotropy(Math.min(preset.anisotropy,renderer.capabilities.getMaxAnisotropy()));
+  const visibleParticles=Math.round(particleCount*preset.particles);
+  worldParticles.geometry.setDrawRange(0,visibleParticles);
+  worldParticles.visible=visibleParticles>0;
+  camera.far=preset.cameraFar;camera.updateProjectionMatrix();
+  renderer.toneMapping=preset.toneMapping?THREE.ACESFilmicToneMapping:THREE.NoToneMapping;
+  renderer.toneMappingExposure=preset.toneMapping?1.15:1;
+  hemisphereLight.intensity=preset.toneMapping?1.35:1.15;
+  moonHalo.visible=preset.effectDensity>=.7;
+  setEnemyEffectQuality(preset.effectDensity);
+  const visibleSkyline=Math.ceil(skylineDecorations.length*preset.skyline);
+  skylineDecorations.forEach((mesh,index)=>{mesh.visible=index<visibleSkyline;});
+  enemies.forEach(applyEnemyGraphicsDetail);
+  abilityEffects.forEach((effect)=>{
+    if(effect.mesh.children.length<=1)return;
+    const visibleChildren=Math.max(1,Math.ceil(effect.mesh.children.length*preset.effectDensity));
+    effect.mesh.children.forEach((child,index)=>{child.visible=index<visibleChildren;});
+  });
+  document.body.dataset.graphics=activeGraphicsPreset;
+  if(resetSamples){qualityTime=0;qualityFrames=0;qualityRecoverySamples=0;qualityLowSamples=0;}
+  updateGraphicsReadout();
+}
+
+if(graphicsMode==="auto"&&renderer.capabilities.maxTextureSize<=4096&&GRAPHICS_ORDER.indexOf(activeGraphicsPreset)>2){
+  activeGraphicsPreset="medium";
+}
+if(graphicsSelectEl){
+  graphicsSelectEl.value=graphicsMode;
+  graphicsSelectEl.addEventListener("change",()=>{
+    const requested=graphicsSelectEl.value;
+    graphicsMode=requested==="auto"||GRAPHICS_PRESETS[requested]?requested:"auto";
+    try{localStorage.setItem(GRAPHICS_STORAGE_KEY,graphicsMode);}catch{}
+    applyGraphicsPreset(graphicsMode==="auto"?detectGraphicsPreset():graphicsMode);
+  });
+}
+applyGraphicsPreset(activeGraphicsPreset);
 
 
 // Each entry is [enemy type, amount]. Low-tier pressure units remain relevant
@@ -1729,13 +1865,14 @@ function shoot() {
   raycaster.setFromCamera(screenCenter,camera);
   const machineButtonHit=raycaster.intersectObjects(machineHitMeshes,false)[0];
   if(machineButtonHit&&machineButtonHit.distance<5&&removeMachineCompanion(machineButtonHit.object.userData.machine))return;
-  if (ammo <= 0) {
+  if (ammo <= 0 && !noReloadMode) {
     tone(190, .055, .08, "square");
     statusEl.textContent = "Magazine empty - press R";
     return;
   }
 
-  ammo -= 1;
+  if(!noReloadMode)ammo -= 1;
+  else ammo=MAGAZINE_CAPACITY;
   ammoEl.textContent = String(ammo);
   recoil = 1;
   muzzleFlash.material.opacity = 1;
@@ -1757,14 +1894,14 @@ function shoot() {
   createTracer(tracerStart, tracerEnd);
   if (hit) {
     createImpact(hit.point);
-    if (hit.object.userData.enemy) damageEnemy(hit.object.userData.enemy, 25, hit.object.name);
+    if (hit.object.userData.enemy) damageEnemy(hit.object.userData.enemy, 25, hit.object.name,true);
     else if (hit.object.userData.abilityEffect) damageAbilityEffect(hit.object.userData.abilityEffect, 25);
   }
-  if (ammo === 0) statusEl.textContent = "Magazine empty - press R";
+  if (ammo === 0 && !noReloadMode) statusEl.textContent = "Magazine empty - press R";
 }
 
 function updateAmmoWarning(){
-  ammoWarningEl.classList.toggle("hidden",ammo>0||reloading||!gameplayActive()||missionComplete||gameOver);
+  ammoWarningEl.classList.toggle("hidden",noReloadMode||ammo>0||reloading||!gameplayActive()||missionComplete||gameOver);
 }
 
 function playReloadSound(stage){
@@ -1783,6 +1920,7 @@ function playReloadSound(stage){
 }
 
 function reload() {
+  if(noReloadMode){ammo=MAGAZINE_CAPACITY;ammoEl.textContent=String(ammo);statusEl.textContent="No Reload active - magazine locked at full";return;}
   if (reloading || ammo === MAGAZINE_CAPACITY || !gameplayActive()) return;
   reloading = true;
   firingHeld=false;
@@ -2062,6 +2200,7 @@ function spawnEnemy(typeId, elite = false) {
     animationBaseY: 0, baseScale: group.scale.clone(), deathBaseY: group.position.y,
     deathBaseRotationY: group.rotation.y, deathDuration: (typeId===1||typeId===2)?(getEnemyDefinition(typeId).animations.deathDuration||2.4):1.2,
   };
+  applyEnemyGraphicsDetail(enemy);
   const nonRepairSurfaces=new Set([...parts.rings,...parts.glows,...parts.crawlerSmoke,...parts.crawlerSparks]);
   enemy.repairSurfaceMeshes=[];
   group.traverse((child)=>{if(child.isMesh&&!child.userData.crawlerDamageFx&&!nonRepairSurfaces.has(child))enemy.repairSurfaceMeshes.push(child);});
@@ -2682,7 +2821,8 @@ function updateDemolitionSequence(delta,elapsed){
   if(sequence.stage<4&&progress>=.93){sequence.stage=4;playDemolitionStage(4);}
 
   sequence.effects.sparks.forEach((spark,index)=>{
-    if(progress<.39+index*.006||progress>.86){spark.visible=false;return;}
+    const effectLimit=Math.ceil(sequence.effects.sparks.length*GRAPHICS_PRESETS[activeGraphicsPreset].effectDensity);
+    if(index>=effectLimit||progress<.39+index*.006||progress>.86){spark.visible=false;return;}
     if(!spark.visible){spark.visible=true;spark.position.set((Math.random()-.5)*.65,1.45+Math.random()*.65,1.62);}
     spark.position.addScaledVector(spark.userData.velocity,delta);
     spark.userData.velocity.y-=4.2*delta;
@@ -2691,7 +2831,8 @@ function updateDemolitionSequence(delta,elapsed){
   });
   sequence.effects.sparkMaterials.forEach((entry)=>{entry.opacity=progress>.72?Math.max(0,(.88-progress)/.16):1;});
   sequence.effects.smoke.forEach((puff,index)=>{
-    if(progress<.57+index*.035){puff.visible=false;return;}
+    const effectLimit=Math.ceil(sequence.effects.smoke.length*GRAPHICS_PRESETS[activeGraphicsPreset].effectDensity);
+    if(index>=effectLimit||progress<.57+index*.035){puff.visible=false;return;}
     puff.visible=true;
     const smokeAge=Math.max(0,progress-.57-index*.035);
     puff.position.y=1.85+smokeAge*2.3;puff.position.z=1.5-smokeAge*.45;
@@ -2723,6 +2864,8 @@ function animateTransportedEnemy(enemy,elapsed,placement){
 
 function updateMachineRepairAnimation(machine,delta,elapsed,progress,linkedRecovery=false){
   const active=Boolean(machine.processingEnemy);
+  const effectDensity=GRAPHICS_PRESETS[activeGraphicsPreset].effectDensity;
+  const scannerLimit=Math.max(1,Math.ceil(machine.repairScanners.length*effectDensity));
   machine.repairRig.visible=true;
   machine.repairDeploy=THREE.MathUtils.damp(machine.repairDeploy||0,active?1:0,active?7.5:5.5,delta);
   const deploy=machine.repairDeploy*machine.repairDeploy*(3-2*machine.repairDeploy);
@@ -2757,7 +2900,7 @@ function updateMachineRepairAnimation(machine,delta,elapsed,progress,linkedRecov
     // sweep as the five-second taming sequence but in recovery green.
     const cycle=elapsed*5.2+machine.index*.7;
     machine.repairScanners.forEach((scanner,index)=>{
-      scanner.visible=true;
+      scanner.visible=index<scannerLimit;
       scanner.material.color.setHex(0x39ff78);
       scanner.position.y=.58+((elapsed*1.25+index*.7)%2.05);
       scanner.rotation.z+=delta*(index%2?1.7:-1.7);
@@ -2769,7 +2912,7 @@ function updateMachineRepairAnimation(machine,delta,elapsed,progress,linkedRecov
   }
   if(!active){
     machine.repairScanners.forEach((scanner,index)=>{
-      scanner.visible=true;
+      scanner.visible=index<scannerLimit;
       scanner.material.color.setHex(0x72f6ff);
       scanner.position.y=.72+index*.83;
       scanner.rotation.z+=delta*(index%2?.12:-.12);
@@ -2802,7 +2945,7 @@ function updateMachineRepairAnimation(machine,delta,elapsed,progress,linkedRecov
     arm.beam.position.y=-.47-arm.beam.scale.y;
   });
   machine.repairScanners.forEach((scanner,index)=>{
-    scanner.visible=true;
+    scanner.visible=index<scannerLimit;
     scanner.material.color.setHex(0x72f6ff);
     scanner.position.y=.58+((elapsed*1.25+index*.7)%2.05);
     scanner.rotation.z+=delta*(index%2?1.7:-1.7);
@@ -2811,7 +2954,8 @@ function updateMachineRepairAnimation(machine,delta,elapsed,progress,linkedRecov
   });
   machine.repairSparks.forEach((spark,index)=>{
     const burst=Math.sin(cycle*2.6+index*1.91);
-    spark.visible=burst>.58;
+    const sparkLimit=Math.ceil(machine.repairSparks.length*effectDensity);
+    spark.visible=index<sparkLimit&&burst>.58;
     if(!spark.visible)return;
     const side=index%2?-1:1,age=(burst-.58)/.42;
     spark.position.set(side*(.28+age*.42),.72+(index%4)*.36+age*.16,(index%3-.9)*.18);
@@ -2965,7 +3109,8 @@ function beginWave(waveNumber) {
 function updateSpawning(delta) {
   if (!waveActive || spawnQueue.length === 0) return;
   spawnCooldown -= delta;
-  const livingLimit = Math.min(performanceMode?9:11, 6 + Math.floor(currentWave / 5));
+  // Graphics quality never changes wave difficulty or active-enemy pacing.
+  const livingLimit = Math.min(11, 6 + Math.floor(currentWave / 5));
   if (spawnCooldown <= 0 && livingHostiles().length < livingLimit) {
     const next = spawnQueue.shift();
     spawnEnemy(next.typeId, next.elite);
@@ -3122,9 +3267,13 @@ function updateEnemyAnimation(enemy, delta, elapsed, movementSpeed) {
     nextAmbientEnemySoundAt=elapsed+.065;
     enemy.nextStepSound = elapsed + (enemy.typeId === 1 ? .22 : enemy.flying ? .48 : THREE.MathUtils.clamp(.62 / enemy.speed, .2, .48));
   }
-  // Keep gameplay movement at full rate; only distant model-part animation is
-  // reduced when the adaptive monitor detects a slow device.
-  if(performanceMode&&listenerDistance>16&&(renderFrame+Math.floor(enemy.seed*10))%2===0)return;
+  // Gameplay movement and attacks remain full-rate. Presets only sample the
+  // expensive articulated model pose less often, mostly for distant actors.
+  const graphicsPreset=GRAPHICS_PRESETS[activeGraphicsPreset];
+  const animationStride=listenerDistance>graphicsPreset.animationFarDistance
+    ?graphicsPreset.animationFarStride
+    :graphicsPreset.animationNearStride;
+  if(animationStride>1&&(renderFrame+Math.floor(enemy.seed*10))%animationStride!==0)return;
   const stunned=elapsed<(enemy.stunnedUntil||0),stunnedDuration=stunned?(getEnemyDefinition(enemy.typeId).animations.stunnedDuration||2.2):1;
   if(stunned)updateCrawlerStunnedSound(enemy,elapsed);
   else if(enemy.typeId===1)enemy.nextCrawlerStunnedSound=0;
@@ -3167,6 +3316,10 @@ function createAbilityEffect(kind, position, options = {}) {
     hp: options.hp ?? 0, onExpire: options.onExpire ?? null, hitPlayer: false,
   };
   mesh.userData.abilityEffect = effect;
+  if(mesh.children.length>1){
+    const visibleChildren=Math.max(1,Math.ceil(mesh.children.length*GRAPHICS_PRESETS[activeGraphicsPreset].effectDensity));
+    mesh.children.forEach((child,index)=>{child.visible=index<visibleChildren;});
+  }
   if (effect.hp > 0) abilityHitMeshes.push(mesh);
   abilityEffects.push(effect);
   return effect;
@@ -3245,7 +3398,10 @@ function updateAbilityEffects(delta) {
   for (let i = abilityEffects.length - 1; i >= 0; i -= 1) {
     const effect = abilityEffects[i];
     if (!effect) continue;
-    advanceAbilityVisual(effect,delta);
+    const visualStride=GRAPHICS_PRESETS[activeGraphicsPreset].abilityVisualStride;
+    const precisionVisual=effect.kind==="scrap-burrow"||effect.kind==="scrap-emerge";
+    const animateVisual=precisionVisual||visualStride===1||(renderFrame+i)%visualStride===0;
+    advanceAbilityVisual(effect,delta,animateVisual,delta*visualStride);
     if (effect.kind === "toxic-cloud" || effect.kind === "electric-web" || effect.kind === "flame-wall") {
       if (effect.age >= effect.activeAfter && effect.age >= effect.tickAt && combatTargetDistance(effect.target,effect.mesh.position) <= effect.radius) {
         damageCombatTarget(effect.target,effect.damage,effect.kind.replaceAll("-", " "),effect.owner);
@@ -3388,7 +3544,7 @@ function activateSignatureAbility(enemy, elapsed, distance, target = null) {
       createAbilityEffect("emp-pulse", enemy.group.position, { color: visualColor, radius: 7, life: .65 });
       if (distance < 7) {
         if(!target){sprintDisabledUntil=performance.now()+3500;statusEl.textContent="EMP hit - sprint disabled";}
-        else if(target.tamed)target.tamedStunnedUntil=Math.max(target.tamedStunnedUntil||0,elapsed+2);
+        else if(target.tamed&&!tamedGodMode)target.tamedStunnedUntil=Math.max(target.tamedStunnedUntil||0,elapsed+2);
         else target.stunnedUntil=elapsed+2;
       }
       break;
@@ -3602,7 +3758,7 @@ function isTamedDirectlyVisible(enemy,elapsed){
     unobstructed=tamedVisibilityRaycaster.intersectObjects(shootableSurfaces,false).length===0;
   }
   enemy.directlyVisible=onScreen&&unobstructed;
-  enemy.visibilityCheckAt=elapsed+(performanceMode?.2:.1);
+  enemy.visibilityCheckAt=elapsed+GRAPHICS_PRESETS[activeGraphicsPreset].visibilityInterval;
   return enemy.directlyVisible;
 }
 
@@ -3622,7 +3778,7 @@ function updateHostileTracking(enemy,elapsed){
       unobstructed=hostileVisibilityRaycaster.intersectObjects(shootableSurfaces,false).length===0;
     }
     enemy.hostileDirectlyVisible=onScreen&&unobstructed;
-    enemy.hostileVisibilityCheckAt=elapsed+(performanceMode?.2:.1);
+    enemy.hostileVisibilityCheckAt=elapsed+GRAPHICS_PRESETS[activeGraphicsPreset].visibilityInterval;
   }
   const directlyVisible=Boolean(enemy.hostileDirectlyVisible);
   enemy.hostileTrackingShells?.forEach((shell)=>{shell.visible=!directlyVisible;});
@@ -3643,9 +3799,10 @@ function animateTamedAura(enemy, delta, elapsed) {
   enemy.tameAura.visible=hidden;
   enemy.tameHighlightMeshes?.forEach((shell)=>{shell.visible=hidden;});
   enemy.tameAura.rotation.y+=delta*1.8;
+  const auraLimit=Math.max(2,Math.ceil(enemy.tameAura.children.length*GRAPHICS_PRESETS[activeGraphicsPreset].effectDensity));
   enemy.tameAura.children.forEach((part,index)=>{
     if(index===0)return;
-    part.visible=!performanceMode||index<=3;
+    part.visible=index<auraLimit;
     if(!part.visible)return;
     const angle=(part.userData.auraAngle||0)+elapsed*1.7;
     part.position.set(Math.cos(angle)*.85,.55+Math.sin(elapsed*3+index)*.24,Math.sin(angle)*.85);
@@ -3730,7 +3887,17 @@ function createCompanionRepairDrones(enemy){
 function updateCompanionRepairDrones(enemy,delta,elapsed,repairProgress){
   createCompanionRepairDrones(enemy);
   enemy.group.updateMatrixWorld(true);
+  const linkedMachine=tamingMachines[enemy.machineSlot];
+  const visibleDroneCount=GRAPHICS_PRESETS[activeGraphicsPreset].repairDrones;
   enemy.repairDrones.forEach((drone,index)=>{
+    const droneVisible=index<visibleDroneCount;
+    drone.group.visible=droneVisible;
+    if(linkedMachine?.droneDocks?.[index])linkedMachine.droneDocks[index].droneModel.visible=!droneVisible;
+    if(!droneVisible){
+      drone.beam.visible=false;drone.contactGlow.visible=false;drone.contactRing.visible=false;
+      drone.repairSparks.forEach((spark)=>{spark.visible=false;});
+      return;
+    }
     const deployAge=Math.max(0,elapsed-(enemy.repairDroneDeployStartedAt??elapsed));
     const deployment=Math.min(1,deployAge/drone.deployDuration);
     if(deployment<1){
@@ -3805,7 +3972,8 @@ function updateCompanionRepairDrones(enemy,delta,elapsed,repairProgress){
     drone.contactGlow.visible=stopped&&laserPulse>.04;drone.contactGlow.position.copy(repairDroneTarget);drone.contactGlow.scale.setScalar(.035+laserPulse*.075);
     drone.contactRing.visible=stopped&&laserPulse>.06;drone.contactRing.position.copy(repairDroneTarget);drone.contactRing.scale.setScalar(.11+laserPulse*.22);drone.contactMaterial.opacity=.18+laserPulse*.78;
     drone.repairSparks.forEach((spark,sparkIndex)=>{
-      spark.visible=stopped&&laserPulse>.22;
+      const sparkLimit=Math.ceil(drone.repairSparks.length*GRAPHICS_PRESETS[activeGraphicsPreset].effectDensity);
+      spark.visible=sparkIndex<sparkLimit&&stopped&&laserPulse>.22;
       const sparkPhase=elapsed*18+index*3.7+sparkIndex*2.1;
       spark.position.set(repairDroneTarget.x+Math.cos(sparkPhase)*(.05+sparkIndex*.035),repairDroneTarget.y+.04+Math.sin(sparkPhase*1.3)*(.08+sparkIndex*.025),repairDroneTarget.z+Math.sin(sparkPhase)*(.05+sparkIndex*.035));
       spark.scale.setScalar(.018+laserPulse*.018);spark.rotation.y=sparkPhase;
@@ -3850,6 +4018,10 @@ function updateReturningCompanionRepairDrones(enemy,delta,elapsed){
   const returnAge=Math.max(0,elapsed-enemy.repairDroneReturnStartedAt);
   let allDocked=true;
   enemy.repairDrones.forEach((drone,index)=>{
+    const droneVisible=index<GRAPHICS_PRESETS[activeGraphicsPreset].repairDrones;
+    drone.group.visible=droneVisible;
+    const linkedMachine=tamingMachines[enemy.machineSlot];
+    if(linkedMachine?.droneDocks?.[index])linkedMachine.droneDocks[index].droneModel.visible=!droneVisible;
     const progress=Math.min(1,returnAge/drone.returnDuration);
     allDocked=allDocked&&progress>=1;
     setRepairDroneRoutePosition(drone.group.position,drone.returnStartPosition,drone.returnTarget,drone.returnRoute,progress);
@@ -3880,6 +4052,7 @@ function removeCompanionRepairDrones(enemy){
 
 function damageTamedEnemy(enemy, amount, source) {
   if(!enemy?.tamed || clock.elapsedTime<(enemy.tamedStunnedUntil||0))return;
+  if(tamedGodMode){statusEl.textContent=`Tamed God Mode protected ${enemy.type.name}`;return;}
   enemy.health=Math.max(0,enemy.health-amount);
   enemy.bodyMaterial.emissive.setHex(0x1677ff); enemy.bodyMaterial.emissiveIntensity=1.3;
   window.setTimeout(()=>{if(enemy.tamed)enemy.bodyMaterial.emissiveIntensity=.2;},90);
@@ -4224,11 +4397,14 @@ function updateProjectiles(delta) {
   }
 }
 
-function damageEnemy(enemy, amount, hitPart) {
+function damageEnemy(enemy, amount, hitPart,playerShot=false) {
   if (!enemy?.alive||isScrapCrawlerUnderground(enemy)) return;
   let actualDamage = amount;
-  if (hitPart === "head") actualDamage *= 2;
-  if (enemy.type.style === "shield" && hitPart !== "head") actualDamage *= .35;
+  if(oneHitMode&&playerShot)actualDamage=Math.max(enemy.health,enemy.maxHealth);
+  else{
+    if (hitPart === "head") actualDamage *= 2;
+    if (enemy.type.style === "shield" && hitPart !== "head") actualDamage *= .35;
+  }
   enemy.health -= actualDamage;
   enemy.bodyMaterial.emissiveIntensity = 1.4;
   window.setTimeout(() => { if (enemy.alive) enemy.bodyMaterial.emissiveIntensity = .12; }, 70);
@@ -4266,7 +4442,10 @@ function disposeEnemyResources(enemy) {
 function killEnemy(enemy) {
   if (!enemy.alive || enemy.tamed) return;
   runKills += 1;
-  runPoints += Math.round((100 + enemy.typeId * 35 + currentWave * 12) * (enemy.elite ? 2 : 1));
+  const earnedPoints=Math.round((100 + enemy.typeId * 35 + currentWave * 12) * (enemy.elite ? 2 : 1));
+  runPoints += earnedPoints;
+  runPointsEl.textContent=runPoints.toLocaleString();
+  showPointsAward(earnedPoints);
   hideHostileTracking(enemy);
   if (enemy.typeId === 1) {
     enemy.group.visible = true;
@@ -4290,6 +4469,16 @@ function killEnemy(enemy) {
   }
   updateEnemyCount();
   if (waveActive && livingHostiles().length===0 && spawnQueue.length === 0) completeWave();
+}
+
+function showPointsAward(points){
+  if(!pointsPopupsEl)return;
+  const popup=document.createElement("span");
+  popup.textContent=`+${points.toLocaleString()} PTS`;
+  popup.style.setProperty("--points-shift",`${(Math.random()-.5)*12}px`);
+  popup.style.top=`${Math.min(pointsPopupsEl.childElementCount,4)*13}px`;
+  pointsPopupsEl.appendChild(popup);
+  window.setTimeout(()=>popup.remove(),1000);
 }
 
 function completeWave() {
@@ -4391,9 +4580,22 @@ function movePlayer(delta) {
   const inputX = THREE.MathUtils.clamp(Number(keys.has("KeyD")) - Number(keys.has("KeyA")) + mobileMove.x, -1, 1);
   const inputZ = THREE.MathUtils.clamp(Number(keys.has("KeyW")) - Number(keys.has("KeyS")) + mobileMove.z, -1, 1);
   const sprinting = (keys.has("ShiftLeft") || keys.has("ShiftRight")) && inputZ > 0 && performance.now() >= sprintDisabledUntil;
-  const slowMultiplier = performance.now() < slowedUntil ? .58 : 1;
-  const speed = (sprinting ? PLAYER.sprint : PLAYER.walk) * slowMultiplier;
-  speedLines.classList.toggle("active", sprinting && gameplayActive());
+  const slowMultiplier = godSpeedMode?1:(performance.now() < slowedUntil ? .58 : 1);
+  const testingSpeedMultiplier=godSpeedMode?3:1;
+  const speed = (sprinting ? PLAYER.sprint : PLAYER.walk) * slowMultiplier * testingSpeedMultiplier;
+  speedLines.classList.toggle("active", (sprinting||godSpeedMode) && gameplayActive()&&(Math.abs(inputX)+Math.abs(inputZ)>.05));
+
+  if(noClipMode){
+    camera.getWorldDirection(forward).normalize();
+    right.crossVectors(forward,camera.up).normalize();
+    const verticalInput=Number(keys.has("Space"))-Number(keys.has("ControlLeft")||keys.has("ControlRight"));
+    moveDirection.set(0,0,0).addScaledVector(forward,inputZ).addScaledVector(right,inputX);
+    moveDirection.y+=verticalInput;
+    if(moveDirection.lengthSq()>0)camera.position.addScaledVector(moveDirection.normalize(),speed*delta);
+    velocity.y=0;
+    canJump=true;
+    return;
+  }
 
   camera.getWorldDirection(forward);
   forward.y = 0;
@@ -4435,6 +4637,8 @@ function resetGame() {
   currentWave = 0;
   runPoints = 0;
   runKills = 0;
+  runPointsEl.textContent="0";
+  pointsPopupsEl.replaceChildren();
   waveActive = false;
   waveStartedAt=0;
   nextWaveAt=0;
@@ -4482,16 +4686,97 @@ function clearCurrentCombat() {
 function setGodMode(enabled) {
   if (enabled && !["admin", "owner"].includes(window.neonAuth?.user?.role)) return;
   godMode = Boolean(enabled);
-  godModeButtonEl.classList.toggle("active", godMode);
-  godModeButtonEl.setAttribute("aria-pressed", String(godMode));
-  godModeStateEl.textContent = godMode ? "ON" : "OFF";
-  godModeIndicatorEl.classList.toggle("hidden", !godMode);
+  updateTestingToggle(godModeButtonEl,godModeStateEl,godMode);
   if (godMode) {
     playerHealth = PLAYER.maxHealth;
     nanoShield=NANO_SHIELD_MAX;
     updateHealthHud();
   }
+  updateTestingIndicator();
   statusEl.textContent = godMode ? "God Mode enabled - damage immunity active" : "God Mode disabled";
+}
+
+function testingAccessAllowed(){return ["admin","owner"].includes(window.neonAuth?.user?.role);}
+
+function updateTestingToggle(button,state,enabled){
+  button?.classList.toggle("active",enabled);
+  button?.setAttribute("aria-pressed",String(enabled));
+  if(state)state.textContent=enabled?"ON":"OFF";
+}
+
+function updateTestingIndicator(){
+  const enabled=[];
+  if(godMode)enabled.push("GOD");
+  if(noClipMode)enabled.push("NO CLIP");
+  if(noReloadMode)enabled.push("NO RELOAD");
+  if(godSpeedMode)enabled.push("3X SPEED");
+  if(oneHitMode)enabled.push("ONE HIT");
+  if(tamedGodMode)enabled.push("TAMED GOD");
+  godModeIndicatorEl.textContent=enabled.length?`TEST // ${enabled.join(" · ")}`:"";
+  godModeIndicatorEl.classList.toggle("hidden",enabled.length===0);
+}
+
+function setNoClipMode(enabled){
+  if(enabled&&!testingAccessAllowed())return;
+  noClipMode=Boolean(enabled);
+  velocity.y=0;canJump=true;
+  if(!noClipMode){
+    const overlapsObstacle=obstacles.some((box)=>camera.position.x+PLAYER.radius>box.minX&&camera.position.x-PLAYER.radius<box.maxX&&camera.position.z+PLAYER.radius>box.minZ&&camera.position.z-PLAYER.radius<box.maxZ);
+    if(!insidePlayableArea(camera.position.x,camera.position.z,PLAYER.radius)||overlapsObstacle)camera.position.set(0,PLAYER.eyeHeight,18);
+    else camera.position.y=Math.max(PLAYER.eyeHeight,camera.position.y);
+  }
+  updateTestingToggle(noClipButtonEl,noClipStateEl,noClipMode);
+  updateTestingIndicator();
+  statusEl.textContent=noClipMode?"No Clip enabled - WASD fly, Space up, Ctrl down":"No Clip disabled - collision restored";
+}
+
+function setNoReloadMode(enabled){
+  if(enabled&&!testingAccessAllowed())return;
+  noReloadMode=Boolean(enabled);
+  if(noReloadMode){
+    ammo=MAGAZINE_CAPACITY;ammoEl.textContent=String(ammo);reloading=false;reloadHand.visible=false;gunMagazine.visible=true;
+  }
+  updateTestingToggle(noReloadButtonEl,noReloadStateEl,noReloadMode);
+  updateTestingIndicator();
+  updateAmmoWarning();
+  statusEl.textContent=noReloadMode?"No Reload enabled - magazine stays full":"No Reload disabled";
+}
+
+function setGodSpeedMode(enabled){
+  if(enabled&&!testingAccessAllowed())return;
+  godSpeedMode=Boolean(enabled);
+  updateTestingToggle(godSpeedButtonEl,godSpeedStateEl,godSpeedMode);
+  updateTestingIndicator();
+  statusEl.textContent=godSpeedMode?"God Speed enabled - movement increased to 3X":"God Speed disabled";
+}
+
+function setOneHitMode(enabled){
+  if(enabled&&!testingAccessAllowed())return;
+  oneHitMode=Boolean(enabled);
+  updateTestingToggle(oneHitButtonEl,oneHitStateEl,oneHitMode);
+  updateTestingIndicator();
+  statusEl.textContent=oneHitMode?"One Hit enabled - player shots eliminate targets":"One Hit disabled";
+}
+
+function setTamedGodMode(enabled){
+  if(enabled&&!testingAccessAllowed())return;
+  tamedGodMode=Boolean(enabled);
+  if(tamedGodMode){
+    tamedEnemies.forEach((enemy)=>{
+      enemy.health=enemy.maxHealth;enemy.tamedStunnedUntil=0;enemy.tamedRepairStartedAt=null;
+      enemy.group.rotation.z=0;enemy.group.position.y=0;enemy.steering.set(0,0,0);
+      removeCompanionRepairDrones(enemy);
+      applyEnemyPose(enemy,{elapsed:clock.elapsedTime});
+    });
+    updateSquadUI(clock.elapsedTime);
+  }
+  updateTestingToggle(tamedGodButtonEl,tamedGodStateEl,tamedGodMode);
+  updateTestingIndicator();
+  statusEl.textContent=tamedGodMode?"Tamed God Mode enabled - companions cannot be downed":"Tamed God Mode disabled";
+}
+
+function disableTestingModes(){
+  setGodMode(false);setNoClipMode(false);setNoReloadMode(false);setGodSpeedMode(false);setOneHitMode(false);setTamedGodMode(false);
 }
 
 function changeWaveLevel() {
@@ -4526,6 +4811,11 @@ waveSelectEl.value = "1";
 godModeButtonEl.addEventListener("click", () => {
   if (["admin", "owner"].includes(window.neonAuth?.user?.role)) setGodMode(!godMode);
 });
+noClipButtonEl.addEventListener("click",()=>setNoClipMode(!noClipMode));
+noReloadButtonEl.addEventListener("click",()=>setNoReloadMode(!noReloadMode));
+godSpeedButtonEl.addEventListener("click",()=>setGodSpeedMode(!godSpeedMode));
+oneHitButtonEl.addEventListener("click",()=>setOneHitMode(!oneHitMode));
+tamedGodButtonEl.addEventListener("click",()=>setTamedGodMode(!tamedGodMode));
 changeWaveButtonEl.addEventListener("click", () => {
   if (["admin", "owner"].includes(window.neonAuth?.user?.role)) changeWaveLevel();
 });
@@ -4553,6 +4843,20 @@ function updateMenuState(){
   restartButtonEl.classList.toggle("hidden",!resumable);
   playButtonLabelEl.textContent=resumable?`RESUME WAVE ${currentWave}`:"ENTER THE OUTPOST";
 }
+
+function setMenuSettingsOpen(open){
+  menuSecondaryEl?.classList.toggle("settings-open",open);
+  settingsButtonEl?.classList.toggle("active",open);
+  settingsButtonEl?.setAttribute("aria-pressed",String(open));
+  if(open){
+    updateNetworkEstimate();
+    measureServerPing();
+  }
+}
+
+settingsButtonEl?.addEventListener("click",()=>setMenuSettingsOpen(!menuSecondaryEl?.classList.contains("settings-open")));
+settingsCloseButtonEl?.addEventListener("click",()=>setMenuSettingsOpen(false));
+refreshPingButtonEl?.addEventListener("click",measureServerPing);
 
 function enterMobileGame() {
   mobilePlaying = true;
@@ -4615,7 +4919,7 @@ controls.addEventListener("unlock", () => {
 
 window.addEventListener("keydown", (event) => {
   keys.add(event.code);
-  if (event.code === "Space" && canJump && gameplayActive()) {
+  if (event.code === "Space" && canJump && gameplayActive()&&!noClipMode) {
     velocity.y = PLAYER.jump;
     canJump = false;
   }
@@ -4632,7 +4936,7 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", () => {keys.clear();firingHeld=false;});
 window.addEventListener("neon-auth-changed", (event) => {
-  if (!["admin", "owner"].includes(event.detail?.role) && godMode) setGodMode(false);
+  if (!["admin", "owner"].includes(event.detail?.role)&&(godMode||noClipMode||noReloadMode||godSpeedMode||oneHitMode||tamedGodMode))disableTestingModes();
 });
 window.addEventListener("mousedown", (event) => {
   if(event.button!==0||event.target.closest?.("#squad-panel")||!controls.isLocked)return;
@@ -4738,8 +5042,9 @@ window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderScale = Math.min(renderScale, window.devicePixelRatio, 1);
+  renderScale = Math.min(window.devicePixelRatio||1,GRAPHICS_PRESETS[activeGraphicsPreset].pixelRatio);
   renderer.setPixelRatio(renderScale);
+  updateGraphicsReadout();
 });
 
 function reloadPhase(value,start,end){
@@ -4866,29 +5171,101 @@ function updateWeapon(delta, elapsed) {
 }
 
 function adaptQuality(delta) {
+  if(graphicsMode!=="auto"||!gameplayActive()){
+    qualityTime=0;qualityFrames=0;qualityRecoverySamples=0;qualityLowSamples=0;
+    return;
+  }
   qualityTime += delta;
   qualityFrames += 1;
-  if (qualityTime < 2) return;
+  if (qualityTime < 3) return;
   const fps = qualityFrames / qualityTime;
-  const maxScale = Math.min(window.devicePixelRatio, 1);
-  if (fps < 48) {
-    qualityRecoverySamples=0;
-    if(renderScale>.55){
-      renderScale=Math.max(.55,renderScale-(fps<34?.18:.1));
-      renderer.setPixelRatio(renderScale);
-    }
-    if(fps<40)performanceMode=true;
-  } else if (fps > 57) {
-    qualityRecoverySamples+=1;
-    if(qualityRecoverySamples>=3&&renderScale<maxScale){
-      renderScale=Math.min(maxScale,renderScale+.05);
-      renderer.setPixelRatio(renderScale);
-    }
-    if(qualityRecoverySamples>=5)performanceMode=false;
-  }else qualityRecoverySamples=0;
+  const presetIndex=GRAPHICS_ORDER.indexOf(activeGraphicsPreset);
+  if(fps<44){
+    qualityLowSamples+=1;qualityRecoverySamples=0;
+    if(qualityLowSamples>=2&&presetIndex>0)applyGraphicsPreset(GRAPHICS_ORDER[presetIndex-1]);
+  }else if(fps>58){
+    qualityRecoverySamples+=1;qualityLowSamples=0;
+    if(qualityRecoverySamples>=4&&presetIndex<GRAPHICS_ORDER.length-1)applyGraphicsPreset(GRAPHICS_ORDER[presetIndex+1]);
+  }else{qualityRecoverySamples=0;qualityLowSamples=0;}
+  updateGraphicsReadout(fps);
   qualityTime = 0;
   qualityFrames = 0;
 }
+
+let performanceSampleFrames=0;
+let displayedFps=0;
+let pingRequestActive=false;
+let performanceSampleStarted=performance.now();
+
+function setPerformanceLevel(element,value,warnAt,dangerAt){
+  if(!element)return;
+  element.classList.toggle("performance-warning",value>=warnAt&&value<dangerAt);
+  element.classList.toggle("performance-danger",value>=dangerAt);
+}
+
+function updateNetworkEstimate(){
+  const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+  const downlink=Number(connection?.downlink);
+  if(Number.isFinite(downlink)&&downlink>0){
+    const value=downlink>=10?downlink.toFixed(0):downlink.toFixed(1);
+    if(performanceNetworkEl)performanceNetworkEl.textContent=value;
+    if(settingsNetworkEl)settingsNetworkEl.textContent=value;
+    if(performanceNetworkEl)performanceNetworkEl.parentElement.title=`${String(connection.effectiveType||"network").toUpperCase()} connection // browser estimate`;
+  }else{
+    if(performanceNetworkEl)performanceNetworkEl.textContent="N/A";
+    if(settingsNetworkEl)settingsNetworkEl.textContent="N/A";
+    if(performanceNetworkEl)performanceNetworkEl.parentElement.title="Bandwidth estimate unavailable in this browser";
+  }
+}
+
+async function measureServerPing(){
+  if(pingRequestActive||document.hidden||!performancePingEl)return;
+  pingRequestActive=true;
+  const started=performance.now();
+  try{
+    const pingUrl=new URL("./favicon.svg",window.location.href);
+    pingUrl.searchParams.set("ping",String(Date.now()));
+    const response=await fetch(pingUrl,{method:"HEAD",cache:"no-store",credentials:"same-origin"});
+    if(!response.ok)throw new Error(`Ping failed: ${response.status}`);
+    const ping=Math.max(1,Math.round(performance.now()-started));
+    performancePingEl.textContent=String(ping);
+    if(settingsPingEl)settingsPingEl.textContent=String(ping);
+    setPerformanceLevel(performancePingEl,ping,100,200);
+    setPerformanceLevel(settingsPingEl,ping,100,200);
+  }catch{
+    performancePingEl.textContent="OFF";
+    if(settingsPingEl)settingsPingEl.textContent="OFF";
+    performancePingEl.classList.remove("performance-warning");
+    performancePingEl.classList.add("performance-danger");
+    settingsPingEl?.classList.remove("performance-warning");
+    settingsPingEl?.classList.add("performance-danger");
+  }finally{pingRequestActive=false;}
+}
+
+function updatePerformanceMonitor(){
+  performanceSampleFrames+=1;
+  const sampleSeconds=(performance.now()-performanceSampleStarted)/1000;
+  if(sampleSeconds<.5)return;
+  const instantFps=performanceSampleFrames/sampleSeconds;
+  displayedFps=displayedFps?displayedFps*.65+instantFps*.35:instantFps;
+  if(performanceFpsEl){
+    const roundedFps=Math.max(1,Math.round(displayedFps));
+    performanceFpsEl.textContent=String(roundedFps);
+    if(settingsFpsEl)settingsFpsEl.textContent=String(roundedFps);
+    performanceFpsEl.classList.toggle("performance-warning",roundedFps<45&&roundedFps>=30);
+    performanceFpsEl.classList.toggle("performance-danger",roundedFps<30);
+    settingsFpsEl?.classList.toggle("performance-warning",roundedFps<45&&roundedFps>=30);
+    settingsFpsEl?.classList.toggle("performance-danger",roundedFps<30);
+  }
+  performanceSampleFrames=0;
+  performanceSampleStarted=performance.now();
+}
+
+updateNetworkEstimate();
+const browserConnection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+browserConnection?.addEventListener?.("change",updateNetworkEstimate);
+window.setTimeout(measureServerPing,700);
+window.setInterval(measureServerPing,10000);
 
 function updateWaveStatusHud(){
   if(currentWave===0){statusEl.textContent="PREPARE FOR WAVE 1";return;}
@@ -4936,6 +5313,7 @@ function animate() {
   updateAmmoWarning();
   updateWaveStatusHud();
   adaptQuality(delta);
+  updatePerformanceMonitor();
   renderer.render(scene, camera);
 }
 

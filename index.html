@@ -30,10 +30,16 @@
       </div>
       <div class="brand">NEON OUTPOST <span>50 WAVE SURVIVAL</span></div>
       <div id="god-mode-indicator" class="god-indicator hidden">GOD MODE</div>
+      <div id="performance-monitor" class="performance-monitor" title="Network speed is the browser's estimated connection bandwidth.">
+        <span><b>FPS</b><strong id="performance-fps">--</strong></span>
+        <span><b>PING</b><strong id="performance-ping">--</strong><small>MS</small></span>
+        <span><b>NET</b><strong id="performance-network">--</strong><small>MBPS</small></span>
+      </div>
       <div class="objective">
         <span class="objective-label">WAVE</span>
         <strong><span id="score">0</span>/<span id="total">50</span></strong>
         <span class="hostiles"><span id="enemy-count">0</span> HOSTILES</span>
+        <span class="run-points"><small>POINTS</small><b id="run-points">0</b><i id="points-popups" aria-hidden="true"></i></span>
       </div>
       <div class="health">
         <div class="health-copy"><span>SUIT INTEGRITY</span><strong id="health-value">100</strong></div>
@@ -112,7 +118,8 @@
         <div class="auth-brand">
           <p class="eyebrow">OUTPOST IDENTITY TERMINAL</p>
           <h1 id="auth-title">NEON<br /><span>ACCESS</span></h1>
-          <p>Authenticate before entering the survival protocol.</p>
+          <p class="auth-copy">Authenticate before entering the survival protocol.</p>
+          <div id="auth-enemy-stage" class="auth-enemy-stage" aria-label="Three outpost enemy sentries watching the access terminal"></div>
         </div>
         <div class="auth-terminal">
           <div class="auth-tabs" role="tablist" aria-label="Account access">
@@ -178,13 +185,16 @@
           <span id="play-button-label">ENTER THE OUTPOST</span>
           <span class="arrow">→</span>
         </button>
+        <button id="restart-button" class="restart-button hidden" type="button">
+          <span>RESTART FROM WAVE 1</span>
+          <span class="arrow">&#8635;</span>
+        </button>
         <a id="showcase-button" class="showcase-button staff-feature hidden" href="./flex.html">
           <span>ENEMY SHOWCASE</span>
           <span class="arrow" aria-hidden="true">&#9671;</span>
         </a>
-        <button id="restart-button" class="restart-button hidden" type="button">
-          <span>RESTART FROM WAVE 1</span>
-          <span class="arrow">&#8635;</span>
+        <button id="settings-button" class="settings-button" type="button" aria-pressed="false">
+          <span>SETTINGS</span><small>AUDIO / VIDEO / NETWORK</small>
         </button>
         <button id="manage-users-button" class="manage-users-button owner-feature hidden" type="button">
           <span>MANAGE USERS</span><small>OWNER ACCESS</small>
@@ -197,9 +207,9 @@
         <p class="hint">Press <kbd>ESC</kbd> at any time to pause</p>
         <p class="mobile-hint">Mobile: left joystick to move, drag the right side to aim, and hold FIRE to shoot. Landscape required.</p>
           </div>
-          <div class="menu-secondary">
-            <div class="menu-section-heading"><span>CONTROL SCHEMA</span><small>FIELD INPUTS</small></div>
-        <div class="controls-grid">
+          <div id="menu-secondary" class="menu-secondary">
+            <div class="menu-section-heading menu-main-content"><span>CONTROL SCHEMA</span><small>FIELD INPUTS</small></div>
+        <div class="controls-grid menu-main-content">
           <div><kbd>W A S D</kbd><span>Move</span></div>
           <div><kbd>MOUSE</kbd><span>Look</span></div>
           <div><kbd>SPACE</kbd><span>Jump</span></div>
@@ -210,7 +220,11 @@
           <div><kbd>R / M</kbd><span>Reload / Music</span></div>
           <div><kbd>V / - +</kbd><span>Volume toggle / level</span></div>
         </div>
-        <div class="audio-panel">
+        <div class="menu-section-heading menu-settings-content settings-section-heading">
+          <span>SYSTEM SETTINGS</span>
+          <button id="settings-close-button" type="button">RETURN</button>
+        </div>
+        <div class="audio-panel menu-settings-content">
           <div class="audio-heading"><span>MASTER AUDIO</span><small>DEFAULT 100%</small></div>
           <div class="audio-controls">
             <button id="volume-button" type="button" aria-pressed="true">
@@ -223,7 +237,32 @@
             </button>
           </div>
         </div>
-        <div id="testing-console" class="debug-panel staff-feature hidden">
+        <div class="graphics-panel menu-settings-content">
+          <div class="graphics-heading"><span>GRAPHICS QUALITY</span><small id="graphics-effective">AUTO // DETECTING</small></div>
+          <div class="graphics-controls">
+            <label for="graphics-select">RENDER PRESET</label>
+            <select id="graphics-select" aria-label="Graphics quality">
+              <option value="auto">AUTO (RECOMMENDED)</option>
+              <option value="very-low">VERY LOW</option>
+              <option value="low">LOW</option>
+              <option value="medium">MEDIUM</option>
+              <option value="high">HIGH</option>
+              <option value="very-high">VERY HIGH</option>
+            </select>
+            <p id="graphics-details">Detecting device capability...</p>
+          </div>
+        </div>
+        <div class="network-settings-panel menu-settings-content">
+          <div class="network-settings-heading"><span>PERFORMANCE &amp; NETWORK</span><small>LIVE DIAGNOSTICS</small></div>
+          <div class="network-settings-values">
+            <div><span>FRAME RATE</span><strong id="settings-fps">--</strong><small>FPS</small></div>
+            <div><span>SERVER LATENCY</span><strong id="settings-ping">--</strong><small>MS</small></div>
+            <div><span>EST. NETWORK</span><strong id="settings-network">--</strong><small>MBPS</small></div>
+          </div>
+          <button id="refresh-ping-button" type="button"><span>REFRESH SERVER PING</span><strong>&#8635;</strong></button>
+          <p>Network Mbps is a browser estimate and may be unavailable on some devices.</p>
+        </div>
+        <div id="testing-console" class="debug-panel staff-feature menu-main-content hidden">
           <div class="debug-heading">
             <span>TESTING CONSOLE</span>
             <small>PRESS ESC TO ACCESS</small>
@@ -232,6 +271,26 @@
             <button id="god-mode-button" class="debug-button" type="button" aria-pressed="false">
               <span>GOD MODE</span>
               <strong id="god-mode-state">OFF</strong>
+            </button>
+            <button id="no-clip-button" class="debug-button" type="button" aria-pressed="false">
+              <span>NO CLIP</span>
+              <strong id="no-clip-state">OFF</strong>
+            </button>
+            <button id="no-reload-button" class="debug-button" type="button" aria-pressed="false">
+              <span>NO RELOAD</span>
+              <strong id="no-reload-state">OFF</strong>
+            </button>
+            <button id="god-speed-button" class="debug-button" type="button" aria-pressed="false">
+              <span>GOD SPEED</span>
+              <strong id="god-speed-state">OFF</strong>
+            </button>
+            <button id="one-hit-button" class="debug-button" type="button" aria-pressed="false">
+              <span>ONE HIT</span>
+              <strong id="one-hit-state">OFF</strong>
+            </button>
+            <button id="tamed-god-button" class="debug-button" type="button" aria-pressed="false">
+              <span>TAMED GOD MODE</span>
+              <strong id="tamed-god-state">OFF</strong>
             </button>
             <label class="wave-picker">
               <span>WAVE LEVEL</span>
@@ -290,6 +349,7 @@
     </div>
 
     <script type="module" src="./auth.js"></script>
+    <script type="module" src="./auth-enemies.js"></script>
     <script type="module" src="./game.js"></script>
   </body>
 </html>

@@ -50,10 +50,11 @@ function poseBurrowVisual(effect){
   }
 }
 
-export function advanceAbilityVisual(effect,delta){
+export function advanceAbilityVisual(effect,delta,animate=true,visualDelta=delta){
   effect.age+=delta;
   effect.material.opacity=Math.max(.08,(1-effect.age/effect.life)*.62);
-  if(effect.kind!=="laser"&&effect.kind!=="scrap-burrow"&&effect.kind!=="scrap-emerge")effect.mesh.rotation.y+=delta*1.8;
+  if(!animate)return;
+  if(effect.kind!=="laser"&&effect.kind!=="scrap-burrow"&&effect.kind!=="scrap-emerge")effect.mesh.rotation.y+=visualDelta*1.8;
   if(effect.kind==="warning")effect.mesh.scale.y=1+Math.sin(effect.age*10)*.08;
   if(effect.kind==="scrap-burrow"||effect.kind==="scrap-emerge")poseBurrowVisual(effect);
 }

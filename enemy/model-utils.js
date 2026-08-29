@@ -15,7 +15,13 @@ const armorTextures=new Map();
 const segmentDirection=new THREE.Vector3(),segmentMidpoint=new THREE.Vector3(),segmentUp=new THREE.Vector3(0,1,0);
 export const crawlerAnimatedHip=new THREE.Vector3(),crawlerAnimatedKnee=new THREE.Vector3(),crawlerAnimatedAnkle=new THREE.Vector3();
 
-export function setEnemyModelAnisotropy(value){modelAnisotropy=Math.max(1,Number(value)||1);}
+export function setEnemyModelAnisotropy(value){
+  modelAnisotropy=Math.max(1,Number(value)||1);
+  armorTextures.forEach((texture)=>{
+    texture.anisotropy=modelAnisotropy;
+    texture.needsUpdate=true;
+  });
+}
 
 export function alignCrawlerSegment(mesh,start,end,radius){
   segmentDirection.subVectors(end,start);
@@ -49,7 +55,7 @@ function armorTexture(definition){
   }
   if(definition.model.hazardArmor){context.fillStyle="rgba(255,180,50,.6)";for(let stripe=-128;stripe<256;stripe+=28){context.beginPath();context.moveTo(stripe,112);context.lineTo(stripe+12,112);context.lineTo(stripe-4,128);context.lineTo(stripe-16,128);context.fill();}}
   if(definition.model.surface!=="organic"){context.fillStyle="rgba(4,10,14,.7)";context.fillRect(7,7,30,11);context.fillStyle="rgba(210,255,245,.72)";context.font="bold 8px monospace";context.fillText(`E-${String(definition.id).padStart(2,"0")}`,10,15);}
-  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.anisotropy=Math.min(4,modelAnisotropy);
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.anisotropy=modelAnisotropy;
   armorTextures.set(definition.id,texture);return texture;
 }
 

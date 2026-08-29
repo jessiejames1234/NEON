@@ -7,6 +7,22 @@ The site includes a custom neon shield favicon for its browser tab and hosted de
 - The menu uses a responsive two-column command layout: mission identity, Enter/Resume, Restart, and run information are grouped on the left; controls, audio, and testing tools are grouped on the right. Narrow screens stack the two sections vertically.
 - After a run begins, **Enter the Outpost** changes to **Resume Wave X** and a **Restart From Wave 1** button appears. Restart clears the current run, enemies, pending spawns, carried robots, machine processing, and active effects before beginning wave 1 again.
 
+### Graphics quality
+
+The main/pause menu provides **Auto (Recommended)**, **Very Low**, **Low**, **Medium**, **High**, and **Very High** graphics choices. The selected mode is saved in the browser for that device.
+
+| Preset | Render scale | Particles | Repair drones | Draw distance | Intended hardware |
+|---|---:|---:|---:|---:|---|
+| Very Low | 0.50x | 15% | 1 | 45m | Older or low-power phones |
+| Low | 0.65x | 32% | 2 | 55m | Regular phones and weak laptops |
+| Medium | 0.82x | 58% | 3 | 68m | Modern phones and average laptops |
+| High | 1.00x | 82% | 4 | 80m | Gaming laptops and capable desktops |
+| Very High | 1.35x | 100% | 4 | 95m | Powerful desktop GPUs |
+
+Each tier controls render resolution, ambient particles, texture filtering, camera draw distance, distant skyline density, enemy accessory detail, near/far model-animation sampling, visibility-raycast frequency, ability animation sampling, damage smoke and sparks, repair-station effects, active repair-drone count, tone mapping, and cosmetic visor effects. Gameplay calculations remain full-rate: quality never changes wave composition, enemy damage, movement, targeting, ability timing, or active-enemy pacing.
+
+Auto initially considers touch input, CPU cores, reported device memory, display pixel load, pixel density, and WebGL texture capability. During active combat it samples real frame rate in three-second windows. Sustained low performance lowers one tier, while sustained performance above 58 FPS raises one tier. Multiple samples are required before changing quality to prevent rapid switching. Choosing a manual preset disables live tier changes.
+
 ## Hostile visibility tracking
 
 - A directly visible hostile keeps all of its original model colors and displays a pulsing red **HOSTILE** arrow above its body.
@@ -61,8 +77,14 @@ An internet connection is currently required for Three.js and the Google Fonts i
 Press `Escape` to open the pause menu and use the testing console.
 
 - **God Mode** can be turned on or off from the menu or with `G`. While enabled, player health is restored to 100 and all incoming damage is blocked.
+- **No Clip** disables world boundaries and obstacle collision. Use `WASD` to fly, `Space` to rise, and `Ctrl` to descend.
+- **No Reload** locks the rifle at a full 32-round magazine and cancels any reload already in progress.
+- **God Speed** increases player movement to three times its normal speed and ignores enemy slow effects.
+- **One Hit** makes direct player shots eliminate any damageable hostile. Companion attacks retain their normal damage.
+- **Tamed God Mode** prevents captured companions from taking damage or being stunned. Enabling it immediately restores any downed companions.
 - **Wave Level** contains waves 1 through 50. Choose a wave and press **Change Wave Level** to remove all current enemies, enemy projectiles, queued spawns, and next-wave timers, then immediately start the selected wave.
 - Changing the wave also restores health and ammunition so each test begins from a clean combat state.
+- Testing controls are accepted only for authenticated `admin` and `owner` accounts and are disabled if that privilege is lost during the session.
 
 ## Combat
 

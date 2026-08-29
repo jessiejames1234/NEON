@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import {alignCrawlerSegment,crawlerAnimatedHip,crawlerAnimatedKnee,crawlerAnimatedAnkle} from "./model-utils.js";
 
+let enemyEffectQuality=1;
+export function setEnemyEffectQuality(value){enemyEffectQuality=THREE.MathUtils.clamp(Number(value)||0,.1,1);}
+
 function resetPart(part){
   if(part.userData.basePosition)part.position.copy(part.userData.basePosition);
   if(part.userData.baseRotation)part.rotation.copy(part.userData.baseRotation);
@@ -10,13 +13,13 @@ function resetPart(part){
 export function applyCrawlerMalfunctionEffects(actor,elapsed,intensity=0,death=false,fade=1){
   const active=intensity>.001&&fade>.001;
   actor.parts.crawlerSmoke.forEach((puff,index)=>{
-    if(!active){puff.visible=false;return;}
+    if(!active||index>=Math.ceil(actor.parts.crawlerSmoke.length*enemyEffectQuality)){puff.visible=false;return;}
     const phase=puff.userData.fxPhase||0,cycle=(elapsed*(death?.68:.48)+phase)%1,spread=(death?1.35:1)*intensity;
     puff.visible=true;puff.position.copy(puff.userData.basePosition);puff.position.x+=Math.sin(elapsed*1.7+index)*.07*spread;puff.position.y+=cycle*(death?.48:.34);puff.position.z+=Math.cos(elapsed*1.3+index)*.045*spread;
     puff.scale.copy(puff.userData.baseScale).multiplyScalar((.55+cycle*1.35)*spread);puff.material.opacity=Math.pow(1-cycle,1.45)*(death?.42:.3)*intensity*fade;
   });
   actor.parts.crawlerSparks.forEach((spark,index)=>{
-    if(!active){spark.visible=false;return;}
+    if(!active||index>=Math.ceil(actor.parts.crawlerSparks.length*enemyEffectQuality)){spark.visible=false;return;}
     const phase=spark.userData.fxPhase||0,burst=Math.sin(elapsed*(death?39:31)+phase),on=burst>.18;
     spark.visible=on;spark.position.copy(spark.userData.basePosition);spark.position.x+=Math.sin(elapsed*23+index)*.045*intensity;spark.position.y+=Math.cos(elapsed*19+index)*.035*intensity;
     spark.rotation.copy(spark.userData.baseRotation);spark.rotation.x+=elapsed*(8+index);spark.rotation.z+=Math.sin(elapsed*17+phase)*1.1;spark.scale.copy(spark.userData.baseScale);spark.scale.y*=.45+Math.max(0,burst)*(death?2.3:1.65);spark.material.opacity=Math.min(1,(on?.92:0)*intensity*fade);
@@ -38,7 +41,7 @@ function applyBrokenDroneBodyFailureEffects(actor,elapsed,intensity=0,death=fals
   const rig=actor.parts.brokenDrone,active=intensity>.001&&fade>.001;
   if(!rig)return;
   rig.failureSmoke?.forEach((puff,index)=>{
-    if(!active){puff.visible=false;return;}
+    if(!active||index>=Math.ceil(rig.failureSmoke.length*enemyEffectQuality)){puff.visible=false;return;}
     const phase=puff.userData.fxPhase||0,cycle=(elapsed*(death?.82:.62)+phase)%1;
     puff.visible=true;puff.position.copy(puff.userData.basePosition);
     puff.position.x+=Math.sin(elapsed*2.1+index)*.09*intensity;
@@ -48,7 +51,7 @@ function applyBrokenDroneBodyFailureEffects(actor,elapsed,intensity=0,death=fals
     puff.material.opacity=Math.min(.62,Math.pow(1-cycle,1.35)*(death?.5:.38)*intensity*fade);
   });
   rig.failureSparks?.forEach((spark,index)=>{
-    if(!active){spark.visible=false;return;}
+    if(!active||index>=Math.ceil(rig.failureSparks.length*enemyEffectQuality)){spark.visible=false;return;}
     const phase=spark.userData.fxPhase||0,burst=Math.sin(elapsed*(death?44:35)+phase),on=burst>-.02;
     spark.visible=on;spark.position.copy(spark.userData.basePosition);
     spark.position.x+=Math.sin(elapsed*29+index)*.065*intensity;
