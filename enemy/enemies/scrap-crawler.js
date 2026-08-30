@@ -180,5 +180,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"scrap-crawler",flying:false,surface:"metal",hazardArmor:false},
   sound:{base:92,wave:"square",attack:1.15,recipe:"scrape",signature,events:crawlerSoundEvents,burrow:burrowSound},
   animations:{idleDuration:3,locomotion:"walk",locomotionDuration:2.4,attackDuration:3.2,skillDuration:4,skillMotion:"burrow",stunnedDuration:2.2,deathDuration:2.4,vanishDuration:1},
-skill:{name:"Burrow",handler:"scrapBurrow",cooldown:5,minDistance:4,color:0xd8883b,targetDistance:10,projectile:false,indicator:{type:"damage",radius:.42,anchor:"origin"}},
+skill:{name:"Burrow",handler:"scrapBurrow",cooldown:5,minDistance:4,maxRange:9,requiresLineOfSight:true,color:0xd8883b,targetDistance:10,projectile:false,indicator:{type:"damage",radius:.42,anchor:"origin"}},
 });

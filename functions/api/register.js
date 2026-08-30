@@ -32,7 +32,10 @@ function validUsername(username) {
 }
 
 function validEmail(email) {
-  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  if (email.length > 254) return false;
+  const [local = "", domain = "", ...extra] = email.split("@");
+  if (extra.length || !local || local.length > 64 || local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false;
+  return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(domain);
 }
 
 async function hashPassword(password, salt) {
@@ -84,8 +87,8 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Enter a valid email address." }, 400);
   }
 
-  if (password.length < 7 || password.length > 128 || !/\d/.test(password)) {
-    return json({ error: "Password must be at least 7 characters and contain a number." }, 400);
+  if (password.length < 7 || password.length > 128 || !/[a-z]/i.test(password) || !/\d/.test(password)) {
+    return json({ error: "Password must be 7–128 characters and contain at least 1 letter and 1 number." }, 400);
   }
 
   // Role and status deliberately do not come from the request. Public users

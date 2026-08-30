@@ -1,5 +1,4 @@
 const authGate = document.querySelector("#auth-gate");
-const sessionLoading = document.querySelector("#session-loading");
 const menu = document.querySelector("#menu");
 const loginTab = document.querySelector("#login-tab");
 const registerTab = document.querySelector("#register-tab");
@@ -20,6 +19,7 @@ const authState = {
 
 const VALID_ROLES = new Set(["player", "admin", "owner"]);
 let sessionRequest = null;
+let sessionRevalidationRequest = null;
 let sessionExpiryTimer = 0;
 
 window.neonAuth = authState;
@@ -89,7 +89,6 @@ function showMenuForUser(user) {
   menuRole.textContent = role.toUpperCase();
   applyRole(role);
   scheduleSessionExpiry(safeUser.sessionExpiresAt);
-  sessionLoading.classList.add("hidden");
   authGate.classList.add("hidden");
   menu.classList.remove("hidden");
   loadLeaderboard();
@@ -102,7 +101,6 @@ function showAuthGate(message = "") {
   authState.user = null;
   authState.ready = true;
   applyRole("player");
-  sessionLoading.classList.add("hidden");
   menu.classList.add("hidden");
   authGate.classList.remove("hidden");
   selectAuthTab("login");
@@ -123,7 +121,12 @@ async function apiRequest(url, options = {}) {
   } catch {
     payload = { error: "The server returned an invalid response." };
   }
-  if (!response.ok) throw new Error(payload.error || `Request failed (${response.status}).`);
+  if (!response.ok) {
+    const error = new Error(payload.error || `Request failed (${response.status}).`);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
   return payload;
 }
 
@@ -151,21 +154,39 @@ async function restoreSession() {
 
 async function revalidateSession() {
   if (!authState.user || document.visibilityState === "hidden") return;
-  const previousUser = authState.user;
+  if (sessionRevalidationRequest) return sessionRevalidationRequest;
+
+  sessionRevalidationRequest = (async () => {
+    const previousUser = authState.user;
+    if (!previousUser) return;
+
+    try {
+      const payload = await apiRequest("/api/session");
+      if (!payload.authenticated || !payload.user) {
+        showAuthGate("YOUR SESSION EXPIRED. SIGN IN AGAIN.");
+        return;
+      }
+      const changed = payload.user.id !== previousUser.id
+        || payload.user.username !== previousUser.username
+        || payload.user.role !== previousUser.role;
+      if (changed) showMenuForUser(payload.user);
+    } catch (error) {
+      if (error.status === 401) {
+        showAuthGate("YOUR SESSION EXPIRED. SIGN IN AGAIN.");
+        return;
+      }
+
+      // A network interruption or temporary server/database failure does not
+      // invalidate the HttpOnly session cookie. Keep the current menu visible
+      // and let the next scheduled check retry silently.
+      console.warn("Session verification temporarily failed; keeping the current session.", error);
+    }
+  })();
+
   try {
-    const payload = await apiRequest("/api/session");
-    if (!payload.authenticated || !payload.user) {
-      showAuthGate("YOUR SESSION EXPIRED. SIGN IN AGAIN.");
-      return;
-    }
-    const changed = payload.user.id !== previousUser.id
-      || payload.user.username !== previousUser.username
-      || payload.user.role !== previousUser.role;
-    if (changed) showMenuForUser(payload.user);
-  } catch (error) {
-    if (!/temporarily unavailable|invalid response/i.test(error.message)) {
-      showAuthGate("YOUR SESSION EXPIRED. SIGN IN AGAIN.");
-    }
+    await sessionRevalidationRequest;
+  } finally {
+    sessionRevalidationRequest = null;
   }
 }
 
@@ -224,6 +245,17 @@ async function loadLeaderboard() {
 loginTab.addEventListener("click", () => selectAuthTab("login"));
 registerTab.addEventListener("click", () => selectAuthTab("register"));
 
+function validRegistrationEmail(email) {
+  if (email.length > 254) return false;
+  const [local = "", domain = "", ...extra] = email.split("@");
+  if (extra.length || !local || local.length > 64 || local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false;
+  return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(domain);
+}
+
+function validRegistrationPassword(password) {
+  return password.length >= 7 && password.length <= 128 && /[A-Za-z]/.test(password) && /\d/.test(password);
+}
+
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   setAuthBusy(loginForm, true);
@@ -247,12 +279,16 @@ registerForm.addEventListener("submit", async (event) => {
   const email = document.querySelector("#register-email").value.trim();
   const password = document.querySelector("#register-password").value;
   const confirmation = document.querySelector("#register-confirm-password").value;
+  if (!validRegistrationEmail(email)) {
+    setAuthMessage("Enter a complete email such as name@gmail.com, name@yahoo.com, or name@phinmaed.com.");
+    return;
+  }
   if (password !== confirmation) {
     setAuthMessage("Passwords do not match.");
     return;
   }
-  if (password.length < 7 || !/\d/.test(password)) {
-    setAuthMessage("Password must be at least 7 characters and contain a number.");
+  if (!validRegistrationPassword(password)) {
+    setAuthMessage("Password must be 7–128 characters and contain at least 1 letter and 1 number.");
     return;
   }
 

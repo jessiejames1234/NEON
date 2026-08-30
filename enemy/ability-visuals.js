@@ -5,6 +5,8 @@ const abilityOrbGeometry=new THREE.SphereGeometry(.5,12,8);
 const abilityBeamGeometry=new THREE.BoxGeometry(1,.07,.16);
 const abilityBurrowRingGeometry=new THREE.RingGeometry(.31,.5,28);
 const abilityBurrowShardGeometry=new THREE.TetrahedronGeometry(.075,0);
+const abilityRadiationRingGeometry=new THREE.TorusGeometry(.5,.025,6,24);
+const abilityRadiationShardGeometry=new THREE.TetrahedronGeometry(.09,0);
 
 export const ABILITY_INDICATOR_COLORS=Object.freeze({damage:0xff263f,buff:0x2587ff,repair:0x2ee87c});
 
@@ -14,6 +16,7 @@ export function indicatorColor(indicator,fallback=0xff496c){
 
 export function createAbilityVisual(scene,kind,position,options={}){
   const burrowVisual=kind==="scrap-burrow"||kind==="scrap-emerge";
+  const radiationRush=kind==="radiation-pack";
   const material=new THREE.MeshBasicMaterial({
     color:options.color??0xff496c,transparent:true,opacity:options.opacity??.5,
     depthWrite:false,blending:THREE.AdditiveBlending,
@@ -23,6 +26,18 @@ export function createAbilityVisual(scene,kind,position,options={}){
     mesh=new THREE.Group();mesh.position.copy(position);mesh.position.y=options.y??.045;
     const ring=new THREE.Mesh(abilityBurrowRingGeometry,material);ring.rotation.x=-Math.PI/2;ring.userData.burrowRing=true;mesh.add(ring);
     for(let index=0;index<8;index+=1){const angle=index*Math.PI*.25,shard=new THREE.Mesh(abilityBurrowShardGeometry,material);shard.position.set(Math.cos(angle)*.43,.025,Math.sin(angle)*.43);shard.rotation.set(angle*.4,angle,angle*.7);shard.userData.burrowShard={angle,index};mesh.add(shard);}
+  }else if(radiationRush){
+    mesh=new THREE.Group();mesh.position.copy(position);mesh.position.y=options.y??.04;
+    const radius=options.radius??4;
+    const core=new THREE.Mesh(abilityDiskGeometry,material);core.scale.set(radius*2,1,radius*2);core.userData.radiationCore=true;mesh.add(core);
+    for(let index=0;index<3;index+=1){
+      const ring=new THREE.Mesh(abilityRadiationRingGeometry,material);ring.rotation.x=Math.PI/2;ring.scale.setScalar(radius*(.45+index*.24));ring.userData.radiationRing={index};mesh.add(ring);
+    }
+    for(let index=0;index<12;index+=1){
+      const angle=index*Math.PI/6,shard=new THREE.Mesh(abilityRadiationShardGeometry,material);
+      shard.position.set(Math.cos(angle)*radius*.34,.05+(index%3)*.035,Math.sin(angle)*radius*.34);
+      shard.rotation.set(angle*.3,angle,angle*.7);shard.userData.radiationShard={angle,index};mesh.add(shard);
+    }
   }else{
     const geometry=options.shape==="orb"?abilityOrbGeometry:options.shape==="beam"?abilityBeamGeometry:abilityDiskGeometry;
     mesh=new THREE.Mesh(geometry,material);mesh.position.copy(position);mesh.position.y=options.shape==="orb"?(options.y??1):(options.y??.045);
@@ -30,9 +45,24 @@ export function createAbilityVisual(scene,kind,position,options={}){
   const radius=options.radius??2;
   const visualRadius=options.visualRadius??(options.shape==="orb"?.55:radius);
   if(options.shape==="beam")mesh.scale.set(options.length??12,1,1);
-  else mesh.scale.set(visualRadius*2,options.shape==="orb"?visualRadius*2:1,visualRadius*2);
+  else if(!radiationRush)mesh.scale.set(visualRadius*2,options.shape==="orb"?visualRadius*2:1,visualRadius*2);
   scene.add(mesh);
   return {kind,mesh,material,age:0,life:options.life??2,radius,baseScale:mesh.scale.clone(),baseRotationY:mesh.rotation.y,baseRotationZ:mesh.rotation.z};
+}
+
+function poseRadiationRushVisual(effect){
+  const p=Math.min(1,effect.age/effect.life),charge=THREE.MathUtils.smootherstep(p,0,.32),release=THREE.MathUtils.smootherstep(p,.2,.58);
+  const fade=1-THREE.MathUtils.smootherstep(p,.62,1),pulse=.82+Math.sin(effect.age*22)*.18;
+  for(const child of effect.mesh.children){
+    if(child.userData.radiationCore){if(!child.userData.radiationBaseScale)child.userData.radiationBaseScale=child.scale.clone();child.rotation.y=effect.age*2.4;child.scale.copy(child.userData.radiationBaseScale).multiplyScalar((.68+charge*.32+release*.14)*pulse);continue;}
+    const ring=child.userData.radiationRing;
+    if(ring){if(!child.userData.radiationBaseScale)child.userData.radiationBaseScale=child.scale.clone();child.scale.copy(child.userData.radiationBaseScale).multiplyScalar(.35+release*(1.15+ring.index*.18));child.rotation.z=effect.age*(ring.index%2?3.4:-3.4);child.position.y=.025+Math.sin(effect.age*8+ring.index)*.045*fade;continue;}
+    const shard=child.userData.radiationShard;if(!shard)continue;
+    const radius=effect.radius*(.22+release*(.78+shard.index%3*.045));
+    const angle=shard.angle+effect.age*(1.8+(shard.index%2)*.7);
+    child.position.set(Math.cos(angle)*radius,.04+Math.sin(effect.age*13+shard.index)*(.06+release*.12),Math.sin(angle)*radius);
+    child.rotation.set(shard.angle*.3+effect.age*4.2,angle+effect.age*2.1,shard.angle*.7+effect.age*5.4);child.scale.setScalar((.45+release*.85)*fade);
+  }
 }
 
 function poseBurrowVisual(effect){
@@ -57,6 +87,7 @@ export function advanceAbilityVisual(effect,delta,animate=true,visualDelta=delta
   if(effect.kind!=="laser"&&effect.kind!=="scrap-burrow"&&effect.kind!=="scrap-emerge")effect.mesh.rotation.y+=visualDelta*1.8;
   if(effect.kind==="warning")effect.mesh.scale.y=1+Math.sin(effect.age*10)*.08;
   if(effect.kind==="scrap-burrow"||effect.kind==="scrap-emerge")poseBurrowVisual(effect);
+  if(effect.kind==="radiation-pack")poseRadiationRushVisual(effect);
 }
 
 export function seekAbilityVisual(effect,age){
@@ -67,6 +98,7 @@ export function seekAbilityVisual(effect,age){
   effect.mesh.scale.copy(effect.baseScale);
   if(effect.kind==="warning")effect.mesh.scale.y=1+Math.sin(effect.age*10)*.08;
   if(effect.kind==="scrap-burrow"||effect.kind==="scrap-emerge")poseBurrowVisual(effect);
+  if(effect.kind==="radiation-pack")poseRadiationRushVisual(effect);
 }
 
 export function disposeAbilityVisual(scene,effect){

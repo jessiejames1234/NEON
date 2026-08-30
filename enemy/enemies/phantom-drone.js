@@ -9,5 +9,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"phantom-drone",flying:true,surface:"metal",hazardArmor:false},
 sound:{base:440,wave:"sine",attack:0.65,recipe:"phantom",signature},
   animations:{idleDuration:3,locomotion:"hover",locomotionDuration:2.4,attackDuration:2.2,skillDuration:2.5,skillMotion:"phase",stunnedDuration:2.2,deathDuration:2.4},
-  skill:{name:"Phantom Shift",handler:"phantomShift",cooldown:8,color:0xb675ff,targetDistance:10,projectile:false},
+  skill:{name:"Phantom Shift",handler:"phantomShift",cooldown:8,maxRange:10,requiresLineOfSight:true,color:0xb675ff,targetDistance:10,projectile:false},
 });

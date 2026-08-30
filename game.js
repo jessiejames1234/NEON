@@ -10,7 +10,7 @@ import {
 } from "./enemy/index.js";
 import {createAbilityVisual,advanceAbilityVisual,disposeAbilityVisual,indicatorColor} from "./enemy/ability-visuals.js";
 import {applyEnemyPose,applyEnemyDeathPose,applyCrawlerMalfunctionEffects,setEnemyEffectQuality} from "./enemy/animation-runtime.js";
-import {applyEnemySkillPose,captureEnemySkillPose,getScrapBurrowGroundPosition,getScrapBurrowPhase} from "./enemy/skill-presentation.js";
+import {applyEnemySkillPose,captureEnemySkillPose,getScrapBurrowGroundPosition,getScrapBurrowPhase,setEnemySkillEffectQuality} from "./enemy/skill-presentation.js";
 
 const PLAYER = Object.freeze({ eyeHeight: 1.7, radius: 0.36, walk: 5.6, sprint: 9, jump: 7.2, maxHealth: 100 });
 const ARENA_HALF = 23.5;
@@ -160,11 +160,11 @@ document.body.classList.toggle("mobile-device", isMobileDevice);
 const GRAPHICS_STORAGE_KEY="neon-outpost-graphics-v1";
 const GRAPHICS_ORDER=["very-low","low","medium","high","very-high"];
 const GRAPHICS_PRESETS=Object.freeze({
-  "very-low":{label:"VERY LOW",pixelRatio:.5,particles:.15,anisotropy:1,cameraFar:45,skyline:.22,modelDetail:.35,animationNearStride:2,animationFarStride:4,animationFarDistance:10,visibilityInterval:.34,abilityVisualStride:2,effectDensity:.25,repairDrones:1,toneMapping:false},
-  low:{label:"LOW",pixelRatio:.65,particles:.32,anisotropy:2,cameraFar:55,skyline:.45,modelDetail:.52,animationNearStride:1,animationFarStride:3,animationFarDistance:12,visibilityInterval:.25,abilityVisualStride:2,effectDensity:.45,repairDrones:2,toneMapping:false},
-  medium:{label:"MEDIUM",pixelRatio:.82,particles:.58,anisotropy:4,cameraFar:68,skyline:.72,modelDetail:.72,animationNearStride:1,animationFarStride:2,animationFarDistance:16,visibilityInterval:.16,abilityVisualStride:1,effectDensity:.7,repairDrones:3,toneMapping:true},
-  high:{label:"HIGH",pixelRatio:1,particles:.82,anisotropy:8,cameraFar:80,skyline:1,modelDetail:1,animationNearStride:1,animationFarStride:1,animationFarDistance:20,visibilityInterval:.1,abilityVisualStride:1,effectDensity:1,repairDrones:4,toneMapping:true},
-  "very-high":{label:"VERY HIGH",pixelRatio:1.35,particles:1,anisotropy:16,cameraFar:95,skyline:1,modelDetail:1,animationNearStride:1,animationFarStride:1,animationFarDistance:24,visibilityInterval:.075,abilityVisualStride:1,effectDensity:1,repairDrones:4,toneMapping:true},
+  "very-low":{label:"VERY LOW",pixelRatio:.5,particles:.06,anisotropy:1,cameraFar:42,skyline:.1,modelDetail:1,animationNearStride:1,crowdThreshold:7,crowdAnimationStride:2,animationFarStride:4,animationFarDistance:9,visibilityInterval:.5,sightInterval:.55,navInterval:.55,abilityVisualStride:3,effectDensity:.1,povDetail:.3,povVisualStride:3,tracerStride:4,impactLimit:3,audioDistance:20,enemySoundBudget:1,hitFeedbackMs:120,repairDrones:4,repairSparkStride:5,toneMapping:false,transparentDetail:true},
+  low:{label:"LOW",pixelRatio:.65,particles:.2,anisotropy:2,cameraFar:54,skyline:.32,modelDetail:1,animationNearStride:1,crowdThreshold:9,crowdAnimationStride:2,animationFarStride:3,animationFarDistance:12,visibilityInterval:.38,sightInterval:.42,navInterval:.42,abilityVisualStride:2,effectDensity:.25,povDetail:.5,povVisualStride:2,tracerStride:2,impactLimit:6,audioDistance:28,enemySoundBudget:2,hitFeedbackMs:90,repairDrones:4,repairSparkStride:3,toneMapping:false,transparentDetail:true},
+  medium:{label:"MEDIUM",pixelRatio:.85,particles:.5,anisotropy:4,cameraFar:68,skyline:.65,modelDetail:1,animationNearStride:1,crowdThreshold:99,crowdAnimationStride:1,animationFarStride:2,animationFarDistance:17,visibilityInterval:.2,sightInterval:.32,navInterval:.32,abilityVisualStride:1,effectDensity:.55,povDetail:.75,povVisualStride:1,tracerStride:1,impactLimit:10,audioDistance:36,enemySoundBudget:3,hitFeedbackMs:65,repairDrones:4,repairSparkStride:2,toneMapping:true,transparentDetail:true},
+  high:{label:"HIGH",pixelRatio:1,particles:.82,anisotropy:8,cameraFar:80,skyline:1,modelDetail:1,animationNearStride:1,crowdThreshold:99,crowdAnimationStride:1,animationFarStride:1,animationFarDistance:21,visibilityInterval:.12,sightInterval:.22,navInterval:.24,abilityVisualStride:1,effectDensity:.85,povDetail:.9,povVisualStride:1,tracerStride:1,impactLimit:16,audioDistance:44,enemySoundBudget:4,hitFeedbackMs:45,repairDrones:4,repairSparkStride:1,toneMapping:true,transparentDetail:true},
+  "very-high":{label:"VERY HIGH",pixelRatio:1.3,particles:1,anisotropy:16,cameraFar:95,skyline:1,modelDetail:1,animationNearStride:1,crowdThreshold:99,crowdAnimationStride:1,animationFarStride:1,animationFarDistance:26,visibilityInterval:.075,sightInterval:.16,navInterval:.18,abilityVisualStride:1,effectDensity:1,povDetail:1,povVisualStride:1,tracerStride:1,impactLimit:24,audioDistance:50,enemySoundBudget:6,hitFeedbackMs:35,repairDrones:4,repairSparkStride:1,toneMapping:true,transparentDetail:true},
 });
 
 function readGraphicsPreference(){
@@ -191,6 +191,7 @@ function detectGraphicsPreset(){
 
 let graphicsMode=readGraphicsPreference();
 let activeGraphicsPreset=graphicsMode==="auto"?detectGraphicsPreset():graphicsMode;
+let autoResolutionMultiplier=1;
 let worldParticles=null;
 
 let renderer;
@@ -252,6 +253,7 @@ const enemyHitMeshes = [];
 const enemyProjectiles = [];
 const abilityEffects = [];
 const abilityHitMeshes = [];
+const activeImpacts = [];
 const tamedEnemies = [];
 const nanoDrops = [];
 const tamingMachines = [];
@@ -279,6 +281,9 @@ const NANO_CELL_REPAIR = NANO_SHIELD_MAX * .15;
 let nanoShield = NANO_SHIELD_MAX;
 let nanoWarningState = "stable";
 let lastPlayerDamageAt = Number.NEGATIVE_INFINITY;
+const pendingPlayerDamageFeedback={shield:0,health:0,source:"enemy"};
+let playerHealthHudDirty=false;
+let nextPlayerHitFeedbackAt=0;
 let ammo = MAGAZINE_CAPACITY;
 let reloading = false;
 let reloadStartedAt = 0;
@@ -292,8 +297,13 @@ let lookPointerId = null;
 let lastLookX = 0;
 let lastLookY = 0;
 let recoil = 0;
+let tracerSequence = 0;
+let hostileCrowdCount=0;
+let enemySoundWindowAt=0;
+let enemySoundEvents=0;
 let slowedUntil = 0;
 let sprintDisabledUntil = 0;
+let playerRadiationRushUntil = 0;
 let squadMode = "attack";
 let squadUiAt = 0;
 let godMode = false;
@@ -305,6 +315,10 @@ let tamedGodMode = false;
 let currentWave = 0;
 let runPoints = 0;
 let runKills = 0;
+let scoreSaveDirty=false;
+let lastSubmittedScoreSnapshot="";
+let scoreSubmissionRequest=null;
+let runScoreGeneration=0;
 let waveActive = false;
 let spawnQueue = [];
 let spawnCooldown = 0;
@@ -571,6 +585,7 @@ function createRepairDroneModel(bodyMaterial,metalMaterial,darkMaterial,glowMate
   const emitterGuard=new THREE.Mesh(unitTorusGeometry,darkMaterial);emitterGuard.scale.setScalar(.105);emitterGuard.position.set(0,-.185,.035);emitterGuard.rotation.x=Math.PI/2;group.add(emitterGuard);
 
   group.userData.repairDroneParts={rotors,eye,eyes,emitter};
+  applyRepairDroneGraphicsDetail(group);
   return group;
 }
 
@@ -906,24 +921,111 @@ function updateGraphicsReadout(fps=0){
   if(graphicsDetailsEl){
     const dust=Math.max(0,Math.round(particleCount*preset.particles));
     const fpsCopy=fps>0?` // ${Math.round(fps)} FPS`:"";
-    graphicsDetailsEl.textContent=`${renderScale.toFixed(2)}X RENDER // ${dust} PARTICLES // ${preset.repairDrones} REPAIR DRONES${fpsCopy}${graphicsMode==="auto"?" // LIVE TUNING":" // MANUAL LOCK"}`;
+    graphicsDetailsEl.textContent=`${renderScale.toFixed(2)}X RENDER // FULL MODELS // ${Math.round(preset.povDetail*100)}% POV FX // ${dust} PARTICLES // ${preset.repairDrones} REPAIR DRONES${fpsCopy}${graphicsMode==="auto"?" // LIVE TUNING":" // MANUAL LOCK"}`;
   }
 }
 
+function modelMeshImportance(mesh){
+  const scale=mesh.userData.baseScale||mesh.scale;
+  const volume=Math.abs(scale.x*scale.y*scale.z);
+  const footprint=Math.max(Math.abs(scale.x),Math.abs(scale.y),Math.abs(scale.z));
+  const name=String(mesh.name||"").toLowerCase();
+  let score=Math.cbrt(Math.max(.000001,volume))*.7+footprint*.3;
+  if(/shield|weapon|carbine|baton|blade|cleaver|cannon|visor|eye|fang|foot/.test(name))score+=3;
+  if(mesh.material?.transparent||Number(mesh.material?.transmission)>0)score-=.45;
+  return score;
+}
+
+function addLargestRigMeshes(part,count,target){
+  if(!part)return;
+  const meshes=[];
+  if(part.isMesh)meshes.push(part);
+  else part.traverse((child)=>{if(child.isMesh&&!child.userData.enemyVisualFx&&!child.userData.crawlerDamageFx)meshes.push(child);});
+  meshes.sort((a,b)=>modelMeshImportance(b)-modelMeshImportance(a));
+  meshes.slice(0,count).forEach((mesh)=>target.add(mesh));
+}
+
+function prepareEnemyGraphicsDetail(enemy){
+  if(enemy.graphicsModelMeshes)return;
+  const all=[];
+  enemy.group.traverse((child)=>{
+    if(!child.isMesh||child.userData.enemyVisualFx||child.userData.crawlerDamageFx||child.userData.hostileTrackingShell)return;
+    child.userData.graphicsBaseVisible=child.visible;
+    all.push(child);
+  });
+  const essential=new Set();
+  addLargestRigMeshes(enemy.parts.body,4,essential);
+  addLargestRigMeshes(enemy.parts.head,3,essential);
+  enemy.parts.legs.forEach((part)=>addLargestRigMeshes(part,2,essential));
+  enemy.parts.arms.forEach((part)=>addLargestRigMeshes(part,2,essential));
+  enemy.parts.weapons.forEach((part)=>addLargestRigMeshes(part,3,essential));
+  all.forEach((mesh)=>{
+    if(/shield|weapon|carbine|baton|blade|cleaver|cannon|visor|eye|fang|foot/.test(String(mesh.name||"").toLowerCase()))essential.add(mesh);
+  });
+  enemy.graphicsModelMeshes=all;
+  enemy.graphicsEssentialMeshes=essential;
+  enemy.graphicsOptionalMeshes=all.filter((mesh)=>!essential.has(mesh)).sort((a,b)=>modelMeshImportance(b)-modelMeshImportance(a));
+}
+
+function setEnemyMeshLodAllowed(mesh,allowed){
+  mesh.userData.graphicsLodAllowed=allowed;
+  if(!allowed){mesh.userData.graphicsLodHidden=true;mesh.visible=false;}
+  else if(mesh.userData.graphicsLodHidden){mesh.userData.graphicsLodHidden=false;mesh.visible=mesh.userData.graphicsBaseVisible!==false;}
+}
+
 function applyEnemyGraphicsDetail(enemy){
+  prepareEnemyGraphicsDetail(enemy);
   const preset=GRAPHICS_PRESETS[activeGraphicsPreset];
-  const rings=enemy?.parts?.rings||[];
-  const visibleRings=Math.ceil(rings.length*preset.modelDetail);
-  rings.forEach((ring,index)=>{ring.visible=index<visibleRings;});
+  const visibleOptional=Math.ceil(enemy.graphicsOptionalMeshes.length*preset.modelDetail);
+  enemy.graphicsEssentialMeshes.forEach((mesh)=>{
+    const costlyTransparency=(mesh.material?.transparent||Number(mesh.material?.transmission)>0)&&/viewport|glass|smoke|aura|halo/.test(String(mesh.name||"").toLowerCase());
+    setEnemyMeshLodAllowed(mesh,preset.transparentDetail||!costlyTransparency);
+  });
+  enemy.graphicsOptionalMeshes.forEach((mesh,index)=>{
+    const transparent=mesh.material?.transparent||Number(mesh.material?.transmission)>0;
+    setEnemyMeshLodAllowed(mesh,index<visibleOptional&&(preset.transparentDetail||!transparent));
+  });
+}
+
+function enforceEnemyGraphicsDetail(enemy){
+  enemy.graphicsModelMeshes?.forEach((mesh)=>{if(mesh.userData.graphicsLodAllowed===false)mesh.visible=false;});
+}
+
+function applyRepairDroneGraphicsDetail(group){
+  if(!group)return;
+  if(!group.userData.graphicsOptionalMeshes){
+    const meshes=[];group.traverse((child)=>{if(child.isMesh){child.userData.graphicsBaseVisible=child.visible;meshes.push(child);}});
+    const ordered=[...meshes].sort((a,b)=>modelMeshImportance(b)-modelMeshImportance(a));
+    const essential=new Set(ordered.slice(0,8));
+    const droneParts=group.userData.repairDroneParts;
+    if(droneParts){essential.add(droneParts.eye);essential.add(droneParts.emitter);droneParts.rotors.forEach((rotor)=>addLargestRigMeshes(rotor,1,essential));}
+    group.userData.graphicsEssentialMeshes=essential;
+    group.userData.graphicsOptionalMeshes=meshes.filter((mesh)=>!essential.has(mesh)).sort((a,b)=>modelMeshImportance(b)-modelMeshImportance(a));
+  }
+  const preset=GRAPHICS_PRESETS[activeGraphicsPreset];
+  const optional=group.userData.graphicsOptionalMeshes,visibleCount=Math.ceil(optional.length*preset.modelDetail);
+  group.userData.graphicsEssentialMeshes.forEach((mesh)=>setEnemyMeshLodAllowed(mesh,true));
+  optional.forEach((mesh,index)=>setEnemyMeshLodAllowed(mesh,index<visibleCount&&(preset.transparentDetail||!mesh.material?.transparent)));
+}
+
+function targetRenderScale(preset=GRAPHICS_PRESETS[activeGraphicsPreset]){
+  const multiplier=graphicsMode==="auto"?autoResolutionMultiplier:1;
+  return Math.max(.45,Math.min(window.devicePixelRatio||1,preset.pixelRatio*multiplier));
+}
+
+function applyRenderScale(){
+  const nextScale=targetRenderScale();
+  if(Math.abs(nextScale-renderScale)<.005)return;
+  renderScale=nextScale;
+  renderer.setPixelRatio(renderScale);
+  renderer.setSize(window.innerWidth,window.innerHeight);
 }
 
 function applyGraphicsPreset(presetName,{resetSamples=true}={}){
   if(!GRAPHICS_PRESETS[presetName])return;
   activeGraphicsPreset=presetName;
   const preset=GRAPHICS_PRESETS[presetName];
-  renderScale=Math.min(window.devicePixelRatio||1,preset.pixelRatio);
-  renderer.setPixelRatio(renderScale);
-  renderer.setSize(window.innerWidth,window.innerHeight);
+  applyRenderScale();
   setEnemyModelAnisotropy(Math.min(preset.anisotropy,renderer.capabilities.getMaxAnisotropy()));
   const visibleParticles=Math.round(particleCount*preset.particles);
   worldParticles.geometry.setDrawRange(0,visibleParticles);
@@ -934,9 +1036,13 @@ function applyGraphicsPreset(presetName,{resetSamples=true}={}){
   hemisphereLight.intensity=preset.toneMapping?1.35:1.15;
   moonHalo.visible=preset.effectDensity>=.7;
   setEnemyEffectQuality(preset.effectDensity);
+  setEnemySkillEffectQuality(preset.effectDensity);
   const visibleSkyline=Math.ceil(skylineDecorations.length*preset.skyline);
   skylineDecorations.forEach((mesh,index)=>{mesh.visible=index<visibleSkyline;});
-  enemies.forEach(applyEnemyGraphicsDetail);
+  enemies.forEach((enemy)=>{
+    applyEnemyGraphicsDetail(enemy);
+    enemy.repairDrones?.forEach((drone)=>applyRepairDroneGraphicsDetail(drone.group));
+  });
   abilityEffects.forEach((effect)=>{
     if(effect.mesh.children.length<=1)return;
     const visibleChildren=Math.max(1,Math.ceil(effect.mesh.children.length*preset.effectDensity));
@@ -955,6 +1061,7 @@ if(graphicsSelectEl){
   graphicsSelectEl.addEventListener("change",()=>{
     const requested=graphicsSelectEl.value;
     graphicsMode=requested==="auto"||GRAPHICS_PRESETS[requested]?requested:"auto";
+    autoResolutionMultiplier=1;
     try{localStorage.setItem(GRAPHICS_STORAGE_KEY,graphicsMode);}catch{}
     applyGraphicsPreset(graphicsMode==="auto"?detectGraphicsPreset():graphicsMode);
   });
@@ -1412,6 +1519,7 @@ function worldSoundAudibility(source,nearDistance=4,farDistance=42){
   if(source.isObject3D)source.getWorldPosition(spatialAudioPosition);
   else if(source.group?.isObject3D)source.group.getWorldPosition(spatialAudioPosition);
   else spatialAudioPosition.copy(source);
+  farDistance=Math.min(farDistance,GRAPHICS_PRESETS[activeGraphicsPreset].audioDistance);
   const distance=spatialAudioPosition.distanceTo(camera.position);
   if(distance<=nearDistance)return 1;
   if(distance>=farDistance)return 0;
@@ -1525,14 +1633,15 @@ function playShotSound() {
 }
 
 function playPlayerHurtSound(amount) {
-  healthHudEl.classList.remove("hurt");
-  void healthHudEl.offsetWidth;
-  healthHudEl.classList.add("hurt");
-  window.setTimeout(()=>healthHudEl.classList.remove("hurt"),380);
-  damageFlashEl.classList.remove("hit","shield-hit");
-  void damageFlashEl.offsetWidth;
-  damageFlashEl.classList.add("hit");
-  window.setTimeout(() => damageFlashEl.classList.remove("hit"), 360);
+  if(!healthHudEl.classList.contains("hurt")){
+    healthHudEl.classList.add("hurt");
+    window.setTimeout(()=>healthHudEl.classList.remove("hurt"),380);
+  }
+  if(!damageFlashEl.classList.contains("hit")){
+    damageFlashEl.classList.remove("shield-hit");
+    damageFlashEl.classList.add("hit");
+    window.setTimeout(() => damageFlashEl.classList.remove("hit"), 360);
+  }
   if (!audioContext || !sfxBus) return;
   const now = audioContext.currentTime;
   const severity = THREE.MathUtils.clamp(amount / 35, .35, 1.2);
@@ -1594,19 +1703,29 @@ function playPlayerDeathSound(){
   impact.connect(impactFilter).connect(impactGain).connect(sfxBus);impact.start(now+.7);
 }
 
+function syncNanoShieldImpactColor(){
+  const warning=nanoShield>100&&nanoShield<=250;
+  const critical=nanoShield<=100;
+  [damageFlashEl,nanoShieldImpactEl].forEach((element)=>{
+    if(!element)return;
+    element.classList.toggle("shield-warning",warning);
+    element.classList.toggle("shield-critical",critical);
+  });
+}
+
 function playNanoShieldHitSound(amount){
+  syncNanoShieldImpactColor();
   if(audioContext&&sfxBus){
     const severity=THREE.MathUtils.clamp(amount/45,.3,1.15);
     tone(760,.08,.055*severity,"sine");
     tone(240,.18,.045*severity,"triangle",sfxBus,.025);
   }
-  damageFlashEl.classList.remove("hit","shield-hit");
-  void damageFlashEl.offsetWidth;
-  damageFlashEl.classList.add("shield-hit");
-  window.setTimeout(()=>damageFlashEl.classList.remove("shield-hit"),360);
-  if(nanoShieldImpactEl){
-    nanoShieldImpactEl.classList.remove("shield-hit");
-    void nanoShieldImpactEl.getBoundingClientRect();
+  if(!damageFlashEl.classList.contains("shield-hit")){
+    damageFlashEl.classList.remove("hit");
+    damageFlashEl.classList.add("shield-hit");
+    window.setTimeout(()=>damageFlashEl.classList.remove("shield-hit"),360);
+  }
+  if(nanoShieldImpactEl&&!nanoShieldImpactEl.classList.contains("shield-hit")){
     nanoShieldImpactEl.classList.add("shield-hit");
     window.setTimeout(()=>nanoShieldImpactEl.classList.remove("shield-hit"),480);
   }
@@ -1797,13 +1916,20 @@ function playEnemySignature(enemy, event, volume) {
   }
 }
 
-function playEnemySound(enemy, event) {
+function playEnemySound(enemy, event, volumeMultiplier=1) {
   if (!audioContext || !sfxBus) return;
+  const now=performance.now();
+  if(now-enemySoundWindowAt>=250){enemySoundWindowAt=now;enemySoundEvents=0;}
+  const preset=GRAPHICS_PRESETS[activeGraphicsPreset];
+  const cosmetic=event==="idle"||event==="move"||event==="step";
+  const eventLimit=cosmetic?Math.max(0,preset.enemySoundBudget-1):preset.enemySoundBudget+1;
+  if(enemySoundEvents>=eventLimit)return;
   enemy.group.getWorldPosition(enemyAudioWorldPosition);
   const audibility=worldSoundAudibility(enemyAudioWorldPosition);
   if(audibility<=.001)return;
+  enemySoundEvents+=1;
   const sizeBoost = enemy.typeId >= 19 ? 1.45 : enemy.elite ? 1.2 : 1;
-  const volume = .075 * audibility * sizeBoost;
+  const volume = .075 * audibility * sizeBoost * volumeMultiplier;
   emitEnemySoundRecipe(enemy.typeId,event,volume,{
     tone:(...parameters)=>enemySpatialTone(enemy,...parameters),
     noise:(...parameters)=>enemyNoise(enemy,...parameters),
@@ -1829,13 +1955,22 @@ function playScrapBurrowSound(enemy, phase) {
 }
 
 function createImpact(point) {
+  const preset=GRAPHICS_PRESETS[activeGraphicsPreset];
+  while(activeImpacts.length>=preset.impactLimit){scene.remove(activeImpacts.shift());}
   const impact = new THREE.Mesh(impactGeometry, impactMaterial);
   impact.position.copy(point);
   scene.add(impact);
-  window.setTimeout(() => scene.remove(impact), 1800);
+  activeImpacts.push(impact);
+  window.setTimeout(() => {
+    scene.remove(impact);
+    const index=activeImpacts.indexOf(impact);if(index>=0)activeImpacts.splice(index,1);
+  }, 600+preset.povDetail*1200);
 }
 
 function createTracer(start, end, color = 0x8ffff0) {
+  const preset=GRAPHICS_PRESETS[activeGraphicsPreset];
+  tracerSequence+=1;
+  if(preset.tracerStride>1&&tracerSequence%preset.tracerStride!==0)return;
   const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
   const tracerMaterial = new THREE.LineBasicMaterial({
     color,
@@ -1849,7 +1984,7 @@ function createTracer(start, end, color = 0x8ffff0) {
     scene.remove(tracer);
     geometry.dispose();
     tracerMaterial.dispose();
-  }, 70);
+  }, 35+preset.povDetail*35);
 }
 
 function gameplayActive() {
@@ -1875,8 +2010,9 @@ function shoot() {
   else ammo=MAGAZINE_CAPACITY;
   ammoEl.textContent = String(ammo);
   recoil = 1;
-  muzzleFlash.material.opacity = 1;
-  muzzleFlash.scale.setScalar(.7 + Math.random() * .8);
+  const povDetail=GRAPHICS_PRESETS[activeGraphicsPreset].povDetail;
+  muzzleFlash.material.opacity = .45+povDetail*.55;
+  muzzleFlash.scale.setScalar((.55 + Math.random() * .65)*(.72+povDetail*.28));
   crosshair.classList.add("firing");
   window.setTimeout(() => {
     muzzleFlash.material.opacity = 0;
@@ -2198,15 +2334,15 @@ function spawnEnemy(typeId, elite = false) {
     nextIdleSound: clock.elapsedTime + (typeId === 1 ? .8 + Math.random() : 1.5 + Math.random() * 2.5),
     nextStepSound: clock.elapsedTime + (typeId === 1 ? .08 : Math.random() * .3),
     animationBaseY: 0, baseScale: group.scale.clone(), deathBaseY: group.position.y,
-    deathBaseRotationY: group.rotation.y, deathDuration: (typeId===1||typeId===2)?(getEnemyDefinition(typeId).animations.deathDuration||2.4):1.2,
+    deathBaseRotationY: group.rotation.y, deathDuration: (typeId===1||typeId===2||typeId===3)?(getEnemyDefinition(typeId).animations.deathDuration||2.4):1.2,
   };
   applyEnemyGraphicsDetail(enemy);
   const nonRepairSurfaces=new Set([...parts.rings,...parts.glows,...parts.crawlerSmoke,...parts.crawlerSparks]);
   enemy.repairSurfaceMeshes=[];
-  group.traverse((child)=>{if(child.isMesh&&!child.userData.crawlerDamageFx&&!nonRepairSurfaces.has(child))enemy.repairSurfaceMeshes.push(child);});
+  group.traverse((child)=>{if(child.isMesh&&!child.userData.crawlerDamageFx&&!child.userData.enemyVisualFx&&!nonRepairSurfaces.has(child))enemy.repairSurfaceMeshes.push(child);});
   if(typeId===1)enemy.skillPoseSnapshots=captureEnemySkillPose(group);
   group.traverse((child) => {
-    if (!child.isMesh||child.userData.crawlerDamageFx) return;
+    if (!child.isMesh||child.userData.crawlerDamageFx||child.userData.enemyVisualFx) return;
     child.userData.enemy = enemy;
     enemyHitMeshes.push(child);
   });
@@ -2859,6 +2995,7 @@ function animateTransportedEnemy(enemy,elapsed,placement){
   // Keep the robot readable in the hand, but never spin it inside the chamber.
   enemy.group.rotation.z=carried?Math.sin(elapsed*17+(enemy.seed||0))*.018:0;
   enemy.group.scale.setScalar(carried ? .12 : .42);
+  enforceEnemyGraphicsDetail(enemy);
   if(enemy.typeId===1)updateCrawlerStunnedSound(enemy,elapsed);
 }
 
@@ -3075,6 +3212,7 @@ function updateEnemyCount() {
 function beginWave(waveNumber) {
   if (gameOver || missionComplete) return;
   currentWave = waveNumber;
+  markRunScoreDirty();
   expireCapturableEnemies();
   waveSelectEl.value = String(currentWave);
   scoreEl.textContent = String(currentWave);
@@ -3192,17 +3330,45 @@ function damagePlayer(amount, source = "enemy") {
     shieldDamage=Math.min(nanoShield,remainingDamage);
     nanoShield=Math.max(0,nanoShield-shieldDamage);
     remainingDamage-=shieldDamage;
-    playNanoShieldHitSound(shieldDamage);
   }
   if(remainingDamage>0){
     playerHealth=Math.max(0,playerHealth-remainingDamage);
-    playPlayerHurtSound(remainingDamage);
   }
-  updateHealthHud();
-  statusEl.textContent=remainingDamage>0
-    ? `${source} breached shield -${Math.ceil(remainingDamage)} integrity`
+  pendingPlayerDamageFeedback.shield+=shieldDamage;
+  pendingPlayerDamageFeedback.health+=remainingDamage;
+  pendingPlayerDamageFeedback.source=source;
+  playerHealthHudDirty=true;
+  if (playerHealth <= 0){
+    updateHealthHud();playerHealthHudDirty=false;
+    resetPlayerDamageFeedback();
+    finishGame(false);
+  }
+}
+
+function resetPlayerDamageFeedback(){
+  pendingPlayerDamageFeedback.shield=0;
+  pendingPlayerDamageFeedback.health=0;
+  pendingPlayerDamageFeedback.source="enemy";
+  playerHealthHudDirty=false;
+  nextPlayerHitFeedbackAt=0;
+}
+
+function flushPlayerDamageFeedback(){
+  if(playerHealthHudDirty){updateHealthHud();playerHealthHudDirty=false;}
+  const shieldDamage=pendingPlayerDamageFeedback.shield;
+  const healthDamage=pendingPlayerDamageFeedback.health;
+  if(shieldDamage<=0&&healthDamage<=0)return;
+  const now=performance.now();
+  if(now<nextPlayerHitFeedbackAt)return;
+  const source=pendingPlayerDamageFeedback.source;
+  pendingPlayerDamageFeedback.shield=0;
+  pendingPlayerDamageFeedback.health=0;
+  nextPlayerHitFeedbackAt=now+GRAPHICS_PRESETS[activeGraphicsPreset].hitFeedbackMs;
+  if(healthDamage>0)playPlayerHurtSound(healthDamage);
+  else playNanoShieldHitSound(shieldDamage);
+  statusEl.textContent=healthDamage>0
+    ? `${source} -${Math.ceil(shieldDamage)} shield / -${Math.ceil(healthDamage)} integrity`
     : `${source} hit Nano Shield -${Math.ceil(shieldDamage)}`;
-  if (playerHealth <= 0) finishGame(false);
 }
 
 function updatePlayerRegeneration(delta,elapsed){
@@ -3232,14 +3398,15 @@ function updateHealthHud() {
   const nextWarningState=nanoShield<=100?"critical":nanoShield<=250?"warning":"stable";
   nanoShieldEl.classList.toggle("warning",nextWarningState==="warning");
   nanoShieldEl.classList.toggle("critical",nextWarningState==="critical");
+  syncNanoShieldImpactColor();
   nanoShieldAlertEl.textContent=nextWarningState==="critical"?"!!":nextWarningState==="warning"?"!":"";
   nanoShieldEl.setAttribute("aria-label",`Nano Shield ${Math.ceil(nanoShield)} of ${NANO_SHIELD_MAX}${nextWarningState==="stable"?"":` - ${nextWarningState}`}`);
   if(nextWarningState!==nanoWarningState&&nextWarningState!=="stable")playNanoShieldWarningSound(nextWarningState);
   nanoWarningState=nextWarningState;
 }
 
-function enemyHasLineOfSight(enemy, distance, elapsed, targetPosition = camera.position) {
-  if (elapsed < (enemy.sightRefreshAt || 0)) return enemy.lineOfSight;
+function enemyHasLineOfSight(enemy, distance, elapsed, targetPosition = camera.position, forceRefresh = false) {
+  if (!forceRefresh && elapsed < (enemy.sightRefreshAt || 0)) return enemy.lineOfSight;
   enemySightOrigin.copy(enemy.group.position);
   enemySightOrigin.y += enemy.flying ? .55 : Math.max(.8, enemy.type.scale);
   enemySightDirection.set(targetPosition.x, targetPosition === camera.position ? camera.position.y - .2 : Math.max(.65,targetPosition.y+.65), targetPosition.z)
@@ -3248,7 +3415,7 @@ function enemyHasLineOfSight(enemy, distance, elapsed, targetPosition = camera.p
   enemySightRaycaster.far = distance;
   const obstruction = enemySightRaycaster.intersectObjects(shootableSurfaces, false)[0];
   enemy.lineOfSight = !obstruction || obstruction.distance >= distance - .55;
-  enemy.sightRefreshAt = elapsed + .28 + Math.random() * .12;
+  enemy.sightRefreshAt = elapsed + GRAPHICS_PRESETS[activeGraphicsPreset].sightInterval + Math.random() * .08;
   return enemy.lineOfSight;
 }
 
@@ -3270,9 +3437,12 @@ function updateEnemyAnimation(enemy, delta, elapsed, movementSpeed) {
   // Gameplay movement and attacks remain full-rate. Presets only sample the
   // expensive articulated model pose less often, mostly for distant actors.
   const graphicsPreset=GRAPHICS_PRESETS[activeGraphicsPreset];
+  const crowdedNearStride=hostileCrowdCount>=graphicsPreset.crowdThreshold
+    ?graphicsPreset.crowdAnimationStride
+    :graphicsPreset.animationNearStride;
   const animationStride=listenerDistance>graphicsPreset.animationFarDistance
     ?graphicsPreset.animationFarStride
-    :graphicsPreset.animationNearStride;
+    :crowdedNearStride;
   if(animationStride>1&&(renderFrame+Math.floor(enemy.seed*10))%animationStride!==0)return;
   const stunned=elapsed<(enemy.stunnedUntil||0),stunnedDuration=stunned?(getEnemyDefinition(enemy.typeId).animations.stunnedDuration||2.2):1;
   if(stunned)updateCrawlerStunnedSound(enemy,elapsed);
@@ -3283,6 +3453,7 @@ function updateEnemyAnimation(enemy, delta, elapsed, movementSpeed) {
   if(enemy.skillAnimation&&elapsed<enemy.skillAnimation.endsAt){
     applyEnemySkillPose(enemy,getEnemyDefinition(enemy.typeId),elapsed-enemy.skillAnimation.startedAt,enemy.skillAnimation.duration);
   }else if(enemy.skillAnimation)enemy.skillAnimation=null;
+  enforceEnemyGraphicsDetail(enemy);
 }
 
 function updateDyingEnemy(enemy, delta) {
@@ -3294,7 +3465,10 @@ function updateDyingEnemy(enemy, delta) {
   }
   enemy.deathTime += delta;
   const complete=applyEnemyDeathPose(enemy,enemy.deathTime);
-  if(!complete&&enemy.typeId!==1)keepEnemyAboveArenaFloor(enemy);
+  enforceEnemyGraphicsDetail(enemy);
+  // E03 disassembles into independently falling pieces. Measuring those
+  // pieces as one floor-bound body moved the whole explosion upward each frame.
+  if(!complete&&enemy.typeId!==1&&enemy.typeId!==3)keepEnemyAboveArenaFloor(enemy);
   return complete;
 }
 
@@ -3398,6 +3572,7 @@ function updateAbilityEffects(delta) {
   for (let i = abilityEffects.length - 1; i >= 0; i -= 1) {
     const effect = abilityEffects[i];
     if (!effect) continue;
+    if(effect.kind==="radiation-pack"&&effect.owner?.group){effect.mesh.position.copy(effect.owner.group.position);effect.mesh.position.y=.04;}
     const visualStride=GRAPHICS_PRESETS[activeGraphicsPreset].abilityVisualStride;
     const precisionVisual=effect.kind==="scrap-burrow"||effect.kind==="scrap-emerge";
     const animateVisual=precisionVisual||visualStride===1||(renderFrame+i)%visualStride===0;
@@ -3489,20 +3664,29 @@ function teleportNearCombatTarget(enemy, target = null, behind = false) {
 function activateSignatureAbility(enemy, elapsed, distance, target = null) {
   const id = enemy.typeId;
   const definition=getEnemyDefinition(id);
+  const skill=definition.skill;
+  if(Number.isFinite(skill.maxRange)&&distance>skill.maxRange){
+    enemy.abilityAt=elapsed+.35;
+    return false;
+  }
+  if(skill.requiresLineOfSight&&!enemyHasLineOfSight(enemy,distance,elapsed,combatTargetPosition(target),true)){
+    enemy.abilityAt=elapsed+.35;
+    return false;
+  }
   const visualColor=combatAbilityColor(enemy);
   if (id === 1 && distance <= (definition.skill.minDistance || enemy.type.range)) {
     // Stay above ground and use direct combat when the target is already near.
     // The crawler's melee range is intentionally smaller than its safe dig
     // distance, so use the skill-specific threshold here.
-    enemy.abilityAt = elapsed + .5;
-    return;
+      enemy.abilityAt = elapsed + .5;
+      return false;
   }
   // Scrap Burrow begins its cooldown after the full four-second animation finishes.
   enemy.abilityAt = id === 1 ? Number.POSITIVE_INFINITY : elapsed + ABILITY_COOLDOWNS[id] + Math.random() * 2;
   enemy.abilityTarget=target;
   statusEl.textContent = `${enemy.type.name}: signature ability`;
   enemy.skillAnimation={startedAt:elapsed,duration:definition.animations.skillDuration,endsAt:elapsed+definition.animations.skillDuration};
-  if (id !== 1) playEnemySound(enemy, "attack");
+  if (id !== 1) playEnemySound(enemy,id===3?"skill":"attack");
   switch (definition.skill.handler) {
     case "scrapBurrow": {
       // Burrow owns the complete crawler pose.  Clear any gait/attack blending so
@@ -3532,9 +3716,22 @@ function activateSignatureAbility(enemy, elapsed, distance, target = null) {
       enemy.steering.set(0, 0, 0);
       break;
     case "glowRatRush":
-      enemies.forEach((ally)=>{if(ally.alive&&ally.tamed===enemy.tamed&&ally.typeId===3&&ally.group.position.distanceTo(enemy.group.position)<9)ally.speedBoostUntil=elapsed+5;});
+      {
+        const buffRadius=definition.skill.indicator?.radius||4,buffUntil=elapsed+5;
+        let buffedAllies=0;
+        enemies.forEach((ally)=>{
+          if(!ally.alive||ally.dying||ally.capturable||ally.tamed!==enemy.tamed)return;
+          if(ally.group.position.distanceTo(enemy.group.position)>=buffRadius)return;
+          ally.speedBoostUntil=Math.max(ally.speedBoostUntil||0,buffUntil);
+          buffedAllies+=1;
+        });
+        if(enemy.tamed&&playerDistanceTo(enemy.group.position)<buffRadius){
+          playerRadiationRushUntil=Math.max(playerRadiationRushUntil,buffUntil);
+          statusEl.textContent=`Radiation Rush - operative and ${buffedAllies} squad unit${buffedAllies===1?"":"s"} accelerated`;
+        }else statusEl.textContent=`Radiation Rush - ${buffedAllies} hostile unit${buffedAllies===1?"":"s"} accelerated`;
+      }
       enemy.explodesOnDeath = true;
-      createAbilityEffect("radiation-pack", enemy.group.position, { color: visualColor, radius: 4, life: 1.2 });
+      createAbilityEffect("radiation-pack", enemy.group.position, { color: visualColor, radius: 4, life: definition.animations.skillDuration, owner: enemy, opacity: .72 });
       break;
     case "scanningLock":
       telegraphStrike(enemy, combatTargetPosition(target).clone(), 1.1, 1.15, enemy.damage * 1.5, "Scanning Lock",target);
@@ -3604,6 +3801,7 @@ function activateSignatureAbility(enemy, elapsed, distance, target = null) {
       break;
     }
   }
+  return true;
 }
 
 function removeScrapBurrowMarker(enemy) {
@@ -3971,9 +4169,13 @@ function updateCompanionRepairDrones(enemy,delta,elapsed,repairProgress){
     drone.beam.visible=stopped&&laserPulse>.08;drone.beam.material.opacity=laserPulse*.82;
     drone.contactGlow.visible=stopped&&laserPulse>.04;drone.contactGlow.position.copy(repairDroneTarget);drone.contactGlow.scale.setScalar(.035+laserPulse*.075);
     drone.contactRing.visible=stopped&&laserPulse>.06;drone.contactRing.position.copy(repairDroneTarget);drone.contactRing.scale.setScalar(.11+laserPulse*.22);drone.contactMaterial.opacity=.18+laserPulse*.78;
+    const sparkStride=GRAPHICS_PRESETS[activeGraphicsPreset].repairSparkStride;
     drone.repairSparks.forEach((spark,sparkIndex)=>{
       const sparkLimit=Math.ceil(drone.repairSparks.length*GRAPHICS_PRESETS[activeGraphicsPreset].effectDensity);
-      spark.visible=sparkIndex<sparkLimit&&stopped&&laserPulse>.22;
+      const shouldShowSpark=sparkIndex<sparkLimit&&stopped&&laserPulse>.22;
+      const updateSpark=!spark.visible||sparkStride===1||(renderFrame+index+sparkIndex)%sparkStride===0;
+      spark.visible=shouldShowSpark;
+      if(!shouldShowSpark||!updateSpark)return;
       const sparkPhase=elapsed*18+index*3.7+sparkIndex*2.1;
       spark.position.set(repairDroneTarget.x+Math.cos(sparkPhase)*(.05+sparkIndex*.035),repairDroneTarget.y+.04+Math.sin(sparkPhase*1.3)*(.08+sparkIndex*.025),repairDroneTarget.z+Math.sin(sparkPhase)*(.05+sparkIndex*.035));
       spark.scale.setScalar(.018+laserPulse*.018);spark.rotation.y=sparkPhase;
@@ -4059,8 +4261,8 @@ function damageTamedEnemy(enemy, amount, source) {
   if(enemy.health<=0){
     enemy.tamedRepairStartedAt=clock.elapsedTime;
     enemy.tamedStunnedUntil=enemy.tamedRepairStartedAt+20;
-    enemy.group.rotation.z=(enemy.typeId===1||enemy.typeId===2)?0:1.15; enemy.steering.set(0,0,0);
-    if(enemy.typeId===2){const stunnedDuration=getEnemyDefinition(2).animations.stunnedDuration||2.2;applyEnemyPose(enemy,{elapsed:clock.elapsedTime,stunnedProgress:0});}
+    enemy.group.rotation.z=(enemy.typeId===1||enemy.typeId===2||enemy.typeId===3)?0:1.15; enemy.steering.set(0,0,0);
+    if(enemy.typeId===2||enemy.typeId===3){const stunnedDuration=getEnemyDefinition(enemy.typeId).animations.stunnedDuration||2.2;applyEnemyPose(enemy,{elapsed:clock.elapsedTime,stunnedProgress:0});enforceEnemyGraphicsDetail(enemy);}
     enemy.group.updateMatrixWorld(true);
     createCompanionRepairDrones(enemy);
     if(enemy.typeId===1){playEnemySound(enemy,"stunned");enemy.nextCrawlerStunnedSound=clock.elapsedTime+1.05;}
@@ -4089,7 +4291,12 @@ function companionTransitTarget(position,target){
   const targetAuxiliary=target.z<-29.4;
   if((fromMain&&targetAuxiliary)||(fromAuxiliary&&targetMain)){
     const bridgeX=Math.abs(position.x+8.25)+Math.abs(target.x+8.25)<Math.abs(position.x-8.25)+Math.abs(target.x-8.25)?-8.25:8.25;
-    return {x:bridgeX,z:fromMain?-23.05:-29.25};
+    // Put the entrance waypoint beyond the region boundary. Previously the
+    // main waypoint (-23.05) remained inside `fromMain` (> -23.2), and the
+    // auxiliary waypoint (-29.25) remained inside `fromAuxiliary` (< -29.4).
+    // The .2 stopping distance therefore let companions stop forever without
+    // advancing to the bridge-crossing stage.
+    return {x:bridgeX,z:fromMain?-23.55:-29.05};
   }
   if(!fromMain&&!fromAuxiliary)return {x:position.x<0?-8.25:8.25,z:targetAuxiliary?-30:-22.8};
   return target;
@@ -4125,10 +4332,10 @@ function updateTamedEnemy(enemy, delta, elapsed) {
     updateCrawlerStunnedSound(enemy,elapsed);
     const repairProgress=THREE.MathUtils.clamp((elapsed-(enemy.tamedRepairStartedAt??elapsed))/20,0,1);
     enemy.health=enemy.maxHealth*repairProgress;
-    if(enemy.typeId===1||enemy.typeId===2){const stunnedDuration=getEnemyDefinition(enemy.typeId).animations.stunnedDuration||2.2;applyEnemyPose(enemy,{elapsed,stunnedProgress:(elapsed%stunnedDuration)/stunnedDuration});}
+    if(enemy.typeId===1||enemy.typeId===2||enemy.typeId===3){const stunnedDuration=getEnemyDefinition(enemy.typeId).animations.stunnedDuration||2.2;applyEnemyPose(enemy,{elapsed,stunnedProgress:(elapsed%stunnedDuration)/stunnedDuration});enforceEnemyGraphicsDetail(enemy);}
     enemy.bodyMaterial.emissiveIntensity=.2+Math.sin(elapsed*8)*.08+repairProgress*.18;
     if(enemy.typeId===1){enemy.group.rotation.z=Math.sin(elapsed*7)*.012;enemy.group.position.y=Math.sin(elapsed*5)*.025;}
-    else if(enemy.typeId!==2){enemy.group.rotation.z=1.15+Math.sin(elapsed*7)*.025;enemy.group.position.y=(enemy.flying?.25:0)+Math.sin(elapsed*5)*.025;}
+    else if(enemy.typeId!==2&&enemy.typeId!==3){enemy.group.rotation.z=1.15+Math.sin(elapsed*7)*.025;enemy.group.position.y=(enemy.flying?.25:0)+Math.sin(elapsed*5)*.025;}
     keepEnemyAboveArenaFloor(enemy);
     // Update the complete stunned pose before resolving animated anchors and
     // body-surface raycasts, eliminating the previous one-frame beam lag.
@@ -4196,10 +4403,11 @@ function updateTamedEnemy(enemy, delta, elapsed) {
 
 function updateCapturableEnemy(enemy, delta, elapsed) {
   enemy.captureTimeRemaining=Math.max(0,(enemy.captureTimeRemaining??CAPTURABLE_LIFETIME)-delta);
-  if(enemy.typeId===1||enemy.typeId===2){
+  if(enemy.typeId===1||enemy.typeId===2||enemy.typeId===3){
     updateCrawlerStunnedSound(enemy,elapsed);
     const stunnedDuration=getEnemyDefinition(enemy.typeId).animations.stunnedDuration||2.2;
     applyEnemyPose(enemy,{elapsed,stunnedProgress:(elapsed%stunnedDuration)/stunnedDuration});
+    enforceEnemyGraphicsDetail(enemy);
     if(enemy.typeId===1)enemy.group.rotation.z=Math.sin(elapsed*8)*.012;
   }else enemy.group.rotation.z=THREE.MathUtils.damp(enemy.group.rotation.z,.92,5,delta);
   keepEnemyAboveArenaFloor(enemy);
@@ -4222,15 +4430,17 @@ function updateCapturableEnemy(enemy, delta, elapsed) {
       enemy.captureArrow.material.opacity=.72+Math.sin(elapsed*5+enemy.seed)*.24;
     }
   }
-  if(enemy.typeId!==1)enemy.parts.legs.forEach((leg,index)=>{leg.rotation.x=leg.userData.baseRotation.x+Math.sin(elapsed*7+index)*.05;});
+  if(enemy.typeId!==1&&enemy.typeId!==2&&enemy.typeId!==3)enemy.parts.legs.forEach((leg,index)=>{leg.rotation.x=leg.userData.baseRotation.x+Math.sin(elapsed*7+index)*.05;});
 }
 
 function updateEnemies(delta, elapsed) {
+  hostileCrowdCount=0;
+  for(const unit of enemies)if(unit.alive&&!unit.tamed&&!unit.dying&&!unit.capturable)hostileCrowdCount+=1;
   navRefresh -= delta;
   if (navRefresh <= 0) {
     const playerCellIndex = navIndex(worldToNav(camera.position.x), worldToNav(camera.position.z));
     if (playerCellIndex !== navTargetIndex) rebuildFlowField();
-    navRefresh = .25;
+    navRefresh = GRAPHICS_PRESETS[activeGraphicsPreset].navInterval;
   }
   const deadToRemove = [];
   for (const enemy of enemies) {
@@ -4444,6 +4654,7 @@ function killEnemy(enemy) {
   runKills += 1;
   const earnedPoints=Math.round((100 + enemy.typeId * 35 + currentWave * 12) * (enemy.elite ? 2 : 1));
   runPoints += earnedPoints;
+  markRunScoreDirty();
   runPointsEl.textContent=runPoints.toLocaleString();
   showPointsAward(earnedPoints);
   hideHostileTracking(enemy);
@@ -4461,8 +4672,10 @@ function killEnemy(enemy) {
     makeEnemyCapturable(enemy);
   }else{
     enemy.alive=false; enemy.dying=true; enemy.deathTime=0;
-    playEnemySound(enemy,"death");
+    const explosiveDeath=enemy.typeId===3||enemy.explodesOnDeath;
+    playEnemySound(enemy,explosiveDeath?"explosion":"death",explosiveDeath?1.65:1);
     if (enemy.explodesOnDeath) {
+      // The damaging radius remains exactly aligned with the visible indicator.
       createAbilityEffect("radiation-blast", enemy.group.position, { color: abilityColor[3], radius: 2.6, life: .45 });
       if (playerDistanceTo(enemy.group.position) < 2.6) damagePlayer(enemy.damage * 1.5, "Radiation Blast");
     }
@@ -4530,25 +4743,60 @@ function finishGame(won) {
   window.setTimeout(() => mobilePlaying ? leaveMobileGame() : controls.unlock(), won?250:1750);
 }
 
-async function submitRunScore() {
-  if (!window.neonAuth?.user || currentWave < 1 || runPoints < 1) return;
-  try {
-    const response = await fetch("/api/leaderboard", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: window.neonAuth.user.username,
-        score: runPoints,
-        wave: currentWave,
-        kills: runKills,
-      }),
-    });
-    if (!response.ok) throw new Error(`Score submission failed (${response.status}).`);
-    window.dispatchEvent(new CustomEvent("neon-score-submitted"));
-  } catch (error) {
-    console.error("Unable to submit run score", error);
+function currentRunScorePayload(){
+  if(!window.neonAuth?.user||currentWave<1||runPoints<1)return null;
+  return {name:window.neonAuth.user.username,score:runPoints,wave:currentWave,kills:runKills};
+}
+
+function markRunScoreDirty(){
+  scoreSaveDirty=true;
+}
+
+async function submitRunScore({force=false}={}) {
+  const payload=currentRunScorePayload();
+  if(!payload)return;
+  const snapshot=JSON.stringify(payload);
+  if(snapshot===lastSubmittedScoreSnapshot){scoreSaveDirty=false;return;}
+  if(!force&&!scoreSaveDirty)return;
+  if(scoreSubmissionRequest){
+    await scoreSubmissionRequest;
+    return submitRunScore({force});
   }
+  const generation=runScoreGeneration;
+  scoreSaveDirty=false;
+  scoreSubmissionRequest=(async()=>{
+    try {
+      const response = await fetch("/api/leaderboard", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: snapshot,
+      });
+      if (!response.ok) throw new Error(`Score submission failed (${response.status}).`);
+      if(generation===runScoreGeneration)lastSubmittedScoreSnapshot=snapshot;
+      window.dispatchEvent(new CustomEvent("neon-score-submitted"));
+    } catch (error) {
+      if(generation===runScoreGeneration)scoreSaveDirty=true;
+      console.error("Unable to submit run score", error);
+    } finally {
+      scoreSubmissionRequest=null;
+    }
+  })();
+  return scoreSubmissionRequest;
+}
+
+function submitRunScoreBeacon(){
+  const payload=currentRunScorePayload();
+  if(!payload)return;
+  const snapshot=JSON.stringify(payload);
+  if(!scoreSaveDirty&&snapshot===lastSubmittedScoreSnapshot)return;
+  const body=new Blob([snapshot],{type:"application/json"});
+  if(navigator.sendBeacon?.("/api/leaderboard",body)){
+    lastSubmittedScoreSnapshot=snapshot;scoreSaveDirty=false;return;
+  }
+  fetch("/api/leaderboard",{
+    method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:snapshot,keepalive:true,
+  }).catch(()=>{});
 }
 
 function updatePlayerDeathAnimation(){
@@ -4582,8 +4830,9 @@ function movePlayer(delta) {
   const sprinting = (keys.has("ShiftLeft") || keys.has("ShiftRight")) && inputZ > 0 && performance.now() >= sprintDisabledUntil;
   const slowMultiplier = godSpeedMode?1:(performance.now() < slowedUntil ? .58 : 1);
   const testingSpeedMultiplier=godSpeedMode?3:1;
-  const speed = (sprinting ? PLAYER.sprint : PLAYER.walk) * slowMultiplier * testingSpeedMultiplier;
-  speedLines.classList.toggle("active", (sprinting||godSpeedMode) && gameplayActive()&&(Math.abs(inputX)+Math.abs(inputZ)>.05));
+  const radiationRushMultiplier=clock.elapsedTime<playerRadiationRushUntil?1.45:1;
+  const speed = (sprinting ? PLAYER.sprint : PLAYER.walk) * slowMultiplier * testingSpeedMultiplier * radiationRushMultiplier;
+  speedLines.classList.toggle("active", (sprinting||godSpeedMode||radiationRushMultiplier>1) && gameplayActive()&&(Math.abs(inputX)+Math.abs(inputZ)>.05));
 
   if(noClipMode){
     camera.getWorldDirection(forward).normalize();
@@ -4620,6 +4869,9 @@ function movePlayer(delta) {
 
 function resetGame() {
   clearTimeout(nextWaveTimer);
+  runScoreGeneration+=1;
+  scoreSaveDirty=false;
+  lastSubmittedScoreSnapshot="";
   resetMachineTransport(true);
   enemies.forEach((enemy) => {
     scene.remove(enemy.group);
@@ -4647,6 +4899,7 @@ function resetGame() {
   deathAnimationActive=false;damageFlashEl.classList.remove("fatal-hit");
   playerHealth = PLAYER.maxHealth;
   nanoShield=NANO_SHIELD_MAX;
+  resetPlayerDamageFeedback();
   lastPlayerDamageAt=Number.NEGATIVE_INFINITY;
   scoreEl.textContent = "0";
   statusEl.textContent = "Prepare for wave 1";
@@ -4658,6 +4911,7 @@ function resetGame() {
   reloading = false;
   slowedUntil = 0;
   sprintDisabledUntil = 0;
+  playerRadiationRushUntil = 0;
   updateHealthHud();
   updateEnemyCount();
 }
@@ -4690,6 +4944,7 @@ function setGodMode(enabled) {
   if (godMode) {
     playerHealth = PLAYER.maxHealth;
     nanoShield=NANO_SHIELD_MAX;
+    resetPlayerDamageFeedback();
     updateHealthHud();
   }
   updateTestingIndicator();
@@ -4767,6 +5022,7 @@ function setTamedGodMode(enabled){
       enemy.group.rotation.z=0;enemy.group.position.y=0;enemy.steering.set(0,0,0);
       removeCompanionRepairDrones(enemy);
       applyEnemyPose(enemy,{elapsed:clock.elapsedTime});
+      enforceEnemyGraphicsDetail(enemy);
     });
     updateSquadUI(clock.elapsedTime);
   }
@@ -4789,12 +5045,14 @@ function changeWaveLevel() {
   deathAnimationActive=false;damageFlashEl.classList.remove("fatal-hit");
   playerHealth = PLAYER.maxHealth;
   nanoShield=NANO_SHIELD_MAX;
+  resetPlayerDamageFeedback();
   lastPlayerDamageAt=Number.NEGATIVE_INFINITY;
   ammo = MAGAZINE_CAPACITY;
   ammoEl.textContent = String(MAGAZINE_CAPACITY);
   reloading = false;
   slowedUntil = 0;
   sprintDisabledUntil = 0;
+  playerRadiationRushUntil = 0;
   completeScreen.classList.add("hidden");
   updateHealthHud();
   beginWave(selectedWave);
@@ -4890,8 +5148,12 @@ document.querySelector("#play-button").addEventListener("click", () => {
   initAudio();
   startGameInput();
 });
-restartButtonEl.addEventListener("click",()=>{
+restartButtonEl.addEventListener("click",async()=>{
   initAudio();
+  await Promise.race([
+    submitRunScore({force:true}),
+    new Promise((resolve)=>window.setTimeout(resolve,900)),
+  ]);
   completeScreen.classList.add("hidden");
   resetGame();
   startGameInput();
@@ -4901,6 +5163,8 @@ document.querySelector("#again-button").addEventListener("click", () => {
   resetGame();
   startGameInput();
 });
+
+window.addEventListener("pagehide",submitRunScoreBeacon);
 
 controls.addEventListener("lock", () => {
   showGameplayUI();
@@ -5041,9 +5305,9 @@ if (isMobileDevice) {
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderScale = Math.min(window.devicePixelRatio||1,GRAPHICS_PRESETS[activeGraphicsPreset].pixelRatio);
+  renderScale=targetRenderScale();
   renderer.setPixelRatio(renderScale);
+  renderer.setSize(window.innerWidth, window.innerHeight);
   updateGraphicsReadout();
 });
 
@@ -5146,20 +5410,24 @@ function updateWeapon(delta, elapsed) {
   gun.rotation.x = recoil * .08 - reloadMotion.tilt*.055;
   gun.rotation.z = bob * .008 + reloadMotion.tilt*.17;
   updateGunDisplay();
-  const energyPulse=.82+Math.sin(elapsed*7)*.14+recoil*.3;
-  gunEnergyCoreMaterial.opacity=THREE.MathUtils.clamp(energyPulse,.55,1);
-  gunAmmoCells.forEach((cell,index)=>{
-    const active=index<Math.ceil(ammo/(MAGAZINE_CAPACITY/gunAmmoCells.length));
-    cell.visible=active;cell.material.color.setHex(ammo<=8?0xff4057:0x43f4d0);
-    cell.material.opacity=.72+Math.sin(elapsed*5+index)*.2;
-  });
-  gunVentMaterials.forEach((ventMaterial,index)=>{
-    ventMaterial.color.setHex(reloading?0xff8b3d:ammo<=8?0xff4057:0x43f4d0);
-    ventMaterial.opacity=.35+Math.sin(elapsed*(reloading?11:4)+index)*.22+recoil*.25;
-  });
-  gunReticle.scale.setScalar(1+recoil*.5+Math.sin(elapsed*3)*.04);
-  gunReticleMaterial.opacity=reloading ? .35 : .72+Math.sin(elapsed*4)*.2;
-  opticGlassMaterial.opacity=.13+Math.sin(elapsed*2.5)*.035;
+  const graphicsPreset=GRAPHICS_PRESETS[activeGraphicsPreset];
+  const updatePovMaterials=graphicsPreset.povVisualStride===1||renderFrame%graphicsPreset.povVisualStride===0;
+  if(updatePovMaterials){
+    const energyPulse=.82+Math.sin(elapsed*7)*.14+recoil*.3;
+    gunEnergyCoreMaterial.opacity=THREE.MathUtils.clamp(.5+energyPulse*graphicsPreset.povDetail,.45,1);
+    gunAmmoCells.forEach((cell,index)=>{
+      const active=index<Math.ceil(ammo/(MAGAZINE_CAPACITY/gunAmmoCells.length));
+      cell.visible=active;cell.material.color.setHex(ammo<=8?0xff4057:0x43f4d0);
+      cell.material.opacity=.55+graphicsPreset.povDetail*(.17+Math.sin(elapsed*5+index)*.2);
+    });
+    gunVentMaterials.forEach((ventMaterial,index)=>{
+      ventMaterial.color.setHex(reloading?0xff8b3d:ammo<=8?0xff4057:0x43f4d0);
+      ventMaterial.opacity=.24+graphicsPreset.povDetail*(.11+Math.sin(elapsed*(reloading?11:4)+index)*.22+recoil*.25);
+    });
+    gunReticle.scale.setScalar(1+recoil*.5+Math.sin(elapsed*3)*.04);
+    gunReticleMaterial.opacity=reloading ? .35 : .62+graphicsPreset.povDetail*(.1+Math.sin(elapsed*4)*.2);
+    opticGlassMaterial.opacity=.06+graphicsPreset.povDetail*(.07+Math.sin(elapsed*2.5)*.035);
+  }
   firingHand.position.y=-.34+Math.abs(bob)*.008+recoil*.025;
   firingHand.rotation.x=-.18+recoil*.035;
   if(carryRig.visible){
@@ -5177,15 +5445,31 @@ function adaptQuality(delta) {
   }
   qualityTime += delta;
   qualityFrames += 1;
-  if (qualityTime < 3) return;
+  if (qualityTime < 2) return;
   const fps = qualityFrames / qualityTime;
   const presetIndex=GRAPHICS_ORDER.indexOf(activeGraphicsPreset);
-  if(fps<44){
+  const preset=GRAPHICS_PRESETS[activeGraphicsPreset];
+  const minimumMultiplier=Math.max(.45/preset.pixelRatio,.7);
+  if(fps<50){
     qualityLowSamples+=1;qualityRecoverySamples=0;
-    if(qualityLowSamples>=2&&presetIndex>0)applyGraphicsPreset(GRAPHICS_ORDER[presetIndex-1]);
+    if(autoResolutionMultiplier>minimumMultiplier+.015){
+      autoResolutionMultiplier=Math.max(minimumMultiplier,autoResolutionMultiplier-.08);
+      applyRenderScale();qualityLowSamples=0;
+    }else if(qualityLowSamples>=2&&presetIndex>0){
+      autoResolutionMultiplier=.94;
+      applyGraphicsPreset(GRAPHICS_ORDER[presetIndex-1]);
+    }
   }else if(fps>58){
     qualityRecoverySamples+=1;qualityLowSamples=0;
-    if(qualityRecoverySamples>=4&&presetIndex<GRAPHICS_ORDER.length-1)applyGraphicsPreset(GRAPHICS_ORDER[presetIndex+1]);
+    if(qualityRecoverySamples>=3){
+      if(autoResolutionMultiplier<.985){
+        autoResolutionMultiplier=Math.min(1,autoResolutionMultiplier+.06);
+        applyRenderScale();qualityRecoverySamples=0;
+      }else if(presetIndex<GRAPHICS_ORDER.length-1){
+        autoResolutionMultiplier=.9;
+        applyGraphicsPreset(GRAPHICS_ORDER[presetIndex+1]);
+      }
+    }
   }else{qualityRecoverySamples=0;qualityLowSamples=0;}
   updateGraphicsReadout(fps);
   qualityTime = 0;
@@ -5304,6 +5588,7 @@ function animate() {
     updateSquadUI(elapsed);
     updateCapturePrompt();
   } else {updateOnlyEnemyDeaths(delta);updateNanoCells(delta,elapsed);}
+  flushPlayerDamageFeedback();
   updateSpawnGates(delta,elapsed);
   updateTamingMachines(delta,elapsed);
   updateCarryTutorial(elapsed);

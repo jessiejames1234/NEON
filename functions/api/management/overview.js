@@ -41,7 +41,10 @@ function validUsername(username) {
 }
 
 function validEmail(email) {
-  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  if (email.length > 254) return false;
+  const [local = "", domain = "", ...extra] = email.split("@");
+  if (extra.length || !local || local.length > 64 || local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false;
+  return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(domain);
 }
 
 function integerInRange(value, minimum, maximum) {

@@ -10,5 +10,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"toxic-walker",flying:false,surface:"metal",hazardArmor:false},
   sound:{base:115,wave:"sawtooth",attack:0.72,recipe:"toxic",signature},
   animations:{idleDuration:3,locomotion:"walk",locomotionDuration:2.4,attackDuration:2.2,skillDuration:2.8,skillMotion:"cloud",stunnedDuration:2.2,deathDuration:2.4},
-skill:{name:"Toxic Cloud",handler:"toxicCloud",cooldown:10,color:0x76ff52,targetDistance:3.2,projectile:false,indicator:{type:"damage",radius:3.6,anchor:"self"}},
+skill:{name:"Toxic Cloud",handler:"toxicCloud",cooldown:10,maxRange:3.6,requiresLineOfSight:true,color:0x76ff52,targetDistance:3.2,projectile:false,indicator:{type:"damage",radius:3.6,anchor:"self"}},
 });

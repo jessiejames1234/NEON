@@ -10,5 +10,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"void-assassin",flying:false,surface:"organic",hazardArmor:false},
   sound:{base:275,wave:"square",attack:1.7,recipe:"void",signature},
   animations:{idleDuration:3,locomotion:"walk",locomotionDuration:2.4,attackDuration:3.2,skillDuration:2.2,skillMotion:"shadowDash",stunnedDuration:2.2,deathDuration:2.4},
-  skill:{name:"Void Strike",handler:"voidStrike",cooldown:8,color:0x7d55ff,targetDistance:10,projectile:false},
+  skill:{name:"Void Strike",handler:"voidStrike",cooldown:8,maxRange:9,requiresLineOfSight:true,color:0x7d55ff,targetDistance:10,projectile:false},
 });

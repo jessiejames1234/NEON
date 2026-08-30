@@ -5,8 +5,8 @@ import {
   emitEnemySoundRecipe,emitScrapBurrowRecipe,getEnemyDefinition,
 } from "./enemy/index.js";
 import {createAbilityVisual,seekAbilityVisual,disposeAbilityVisual,indicatorColor} from "./enemy/ability-visuals.js";
-import {applyEnemyPose,applyEnemyDeathPose} from "./enemy/animation-runtime.js";
-import {applyEnemySkillPose,getScrapBurrowGroundPosition,getScrapBurrowPhase} from "./enemy/skill-presentation.js";
+import {applyEnemyPose,applyEnemyDeathPose,setEnemyEffectQuality} from "./enemy/animation-runtime.js";
+import {applyEnemySkillPose,getScrapBurrowGroundPosition,getScrapBurrowPhase,setEnemySkillEffectQuality} from "./enemy/skill-presentation.js";
 
 const mount=document.querySelector("#showroom");
 const scene=new THREE.Scene();
@@ -17,8 +17,32 @@ const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,100);
 const SHOWROOM_SPACING=5.25;
 const ALL_ENEMIES_VIEW=new THREE.Vector3(13,13.5,23.5);
 const ALL_ENEMIES_FRONT_VIEW=new THREE.Vector3(0,8.2,22);
-const showroomPixelRatio=()=>innerWidth<900?1:Math.min(devicePixelRatio,1.25);
-const renderer=new THREE.WebGLRenderer({antialias:devicePixelRatio<=1.25,powerPreference:"high-performance"});
+const GRAPHICS_STORAGE_KEY="neon-outpost-graphics-v1";
+const SHOWROOM_GRAPHICS=Object.freeze({
+  "very-low":{pixelRatio:.5,anisotropy:1,fogFar:34,effectDensity:.1,animationStride:3,toneMapping:false},
+  low:{pixelRatio:.65,anisotropy:2,fogFar:38,effectDensity:.25,animationStride:2,toneMapping:false},
+  medium:{pixelRatio:.85,anisotropy:4,fogFar:42,effectDensity:.55,animationStride:1,toneMapping:true},
+  high:{pixelRatio:1,anisotropy:8,fogFar:48,effectDensity:.85,animationStride:1,toneMapping:true},
+  "very-high":{pixelRatio:1.3,anisotropy:16,fogFar:56,effectDensity:1,animationStride:1,toneMapping:true},
+});
+const coarsePointer=matchMedia("(pointer: coarse)").matches;
+function detectShowroomGraphics(){
+  const memory=Number(navigator.deviceMemory)||0,cores=Number(navigator.hardwareConcurrency)||0;
+  const pixels=innerWidth*innerHeight*Math.min(devicePixelRatio||1,2)**2;
+  let score=coarsePointer?0:2;
+  if(memory){if(memory<=2)score-=2;else if(memory<=4)score-=1;else if(memory>=8)score+=1;}
+  if(cores){if(cores<=2)score-=2;else if(cores<=4)score-=1;else if(cores>=8)score+=1;}
+  if(pixels>5000000)score-=1;
+  return score<=-2?"very-low":score<=0?"low":score<=2?"medium":score<=4?"high":"very-high";
+}
+function readShowroomGraphics(){
+  try{const value=localStorage.getItem(GRAPHICS_STORAGE_KEY);return value==="auto"||SHOWROOM_GRAPHICS[value]?value:"auto";}catch{return "auto";}
+}
+let showroomGraphicsMode=readShowroomGraphics();
+let activeShowroomGraphics=showroomGraphicsMode==="auto"?detectShowroomGraphics():showroomGraphicsMode;
+let showroomAutoResolution=1;
+const showroomPixelRatio=()=>Math.max(.45,Math.min(devicePixelRatio||1,SHOWROOM_GRAPHICS[activeShowroomGraphics].pixelRatio*(showroomGraphicsMode==="auto"?showroomAutoResolution:1)));
+const renderer=new THREE.WebGLRenderer({antialias:!["very-low","low"].includes(activeShowroomGraphics)&&devicePixelRatio<=1.5,powerPreference:"high-performance"});
 renderer.setPixelRatio(showroomPixelRatio());
 renderer.setSize(innerWidth,innerHeight);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -26,7 +50,7 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.12;
 renderer.shadowMap.enabled=false;
 mount.append(renderer.domElement);
-setEnemyModelAnisotropy(Math.min(2,renderer.capabilities.getMaxAnisotropy()));
+setEnemyModelAnisotropy(Math.min(SHOWROOM_GRAPHICS[activeShowroomGraphics].anisotropy,renderer.capabilities.getMaxAnisotropy()));
 
 const ambient=new THREE.HemisphereLight(0x8de8df,0x071018,1.75);scene.add(ambient);
 const key=new THREE.DirectionalLight(0xb9fff6,3.2);
@@ -122,6 +146,32 @@ function render(){
   if(renderFrame)return;
   renderFrame=requestAnimationFrame(()=>{renderFrame=0;renderer.render(scene,camera);});
 }
+
+function applyPreviewEffectDensity(){
+  if(!previewAbilityEffect?.mesh?.children?.length)return;
+  const density=SHOWROOM_GRAPHICS[activeShowroomGraphics].effectDensity;
+  const visibleCount=Math.max(1,Math.ceil(previewAbilityEffect.mesh.children.length*density));
+  previewAbilityEffect.mesh.children.forEach((child,index)=>{child.visible=index<visibleCount;});
+}
+
+function applyShowroomGraphics(presetName){
+  if(!SHOWROOM_GRAPHICS[presetName])return;
+  activeShowroomGraphics=presetName;
+  const preset=SHOWROOM_GRAPHICS[presetName];
+  renderer.setPixelRatio(showroomPixelRatio());
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.toneMapping=preset.toneMapping?THREE.ACESFilmicToneMapping:THREE.NoToneMapping;
+  renderer.toneMappingExposure=preset.toneMapping?1.12:1;
+  scene.fog.near=Math.min(20,preset.fogFar*.48);scene.fog.far=preset.fogFar;
+  camera.far=Math.max(60,preset.fogFar+15);camera.updateProjectionMatrix();
+  setEnemyModelAnisotropy(Math.min(preset.anisotropy,renderer.capabilities.getMaxAnisotropy()));
+  setEnemyEffectQuality(preset.effectDensity);
+  setEnemySkillEffectQuality(preset.effectDensity);
+  document.body.dataset.graphics=presetName;
+  applyPreviewEffectDensity();
+  render();
+}
+
 function setView(position,target=new THREE.Vector3(0,1.2,0)){
   camera.position.copy(position);controls.target.copy(target);controls.update();render();
 }
@@ -356,6 +406,7 @@ function clearPreviewAbilityVisual(){
 function ensurePreviewAbilityVisual(key,kind,position,options){
   if(previewAbilityEffect&&previewAbilityKey!==key)clearPreviewAbilityVisual();
   if(!previewAbilityEffect){previewAbilityEffect=createAbilityVisual(scene,kind,position,options);previewAbilityKey=key;}
+  applyPreviewEffectDensity();
   return previewAbilityEffect;
 }
 
@@ -376,6 +427,7 @@ function animateSkillIndicator(exhibit,definition,time){
   const effect=ensurePreviewAbilityVisual(key,kind,previewAbilityPosition,options);
   effect.mesh.position.x=previewAbilityPosition.x;effect.mesh.position.z=previewAbilityPosition.z;
   seekAbilityVisual(effect,age);
+  applyPreviewEffectDensity();
   if(kind==="shockwave"){
     const waveRadius=effect.radius*Math.min(1,effect.age/effect.life);
     effect.mesh.scale.set(waveRadius*2,1,waveRadius*2);
@@ -420,21 +472,42 @@ function updatePreviewAudio(preview,totalElapsed,elapsed,cycleDuration){
       }
     }else if(!preview.audioTriggered&&progress>=.16){
       preview.audioTriggered=true;
-      playPreviewEnemySound(exhibit,"attack");
+      playPreviewEnemySound(exhibit,exhibit.id===3?"skill":"attack");
     }
-  }else if(action==="death"&&!preview.audioTriggered&&progress>=.48){
+  }else if(action==="death"&&!preview.audioTriggered&&progress>=(exhibit.id===3?.01:.48)){
     preview.audioTriggered=true;
     playPreviewEnemySound(exhibit,"death");
   }
 }
 
+let previewFrameCount=0,autoQualityStartedAt=0,autoQualityFrames=0;
+function updateShowroomAutoQuality(now){
+  if(showroomGraphicsMode!=="auto"){autoQualityStartedAt=now;autoQualityFrames=0;return;}
+  if(!autoQualityStartedAt)autoQualityStartedAt=now;
+  autoQualityFrames+=1;
+  const seconds=(now-autoQualityStartedAt)/1000;
+  if(seconds<2)return;
+  const fps=autoQualityFrames/seconds;
+  const previous=showroomAutoResolution;
+  if(fps<48)showroomAutoResolution=Math.max(.7,showroomAutoResolution-.08);
+  else if(fps>58)showroomAutoResolution=Math.min(1,showroomAutoResolution+.05);
+  if(Math.abs(previous-showroomAutoResolution)>.001){renderer.setPixelRatio(showroomPixelRatio());renderer.setSize(innerWidth,innerHeight);}
+  autoQualityStartedAt=now;autoQualityFrames=0;
+}
+
 function updateAnimationPreview(now){
   animationFrame=0;if(!activePreview)return;
+  updateShowroomAutoQuality(now);
   const {exhibit,action}=activePreview;
   const totalElapsed=(now-activePreview.startedAt)/1000;
   const animation=getEnemyDefinition(exhibit.id).animations;
   const cycleDuration=action==="idle"?animation.idleDuration:action==="walk"?animation.locomotionDuration:action==="attack"?animation.attackDuration:action==="skill"?animation.skillDuration:action==="stunned"?animation.stunnedDuration:exhibit.deathDuration+(animation.vanishDuration||0);
   const elapsed=totalElapsed%cycleDuration;
+  previewFrameCount+=1;
+  const animationStride=SHOWROOM_GRAPHICS[activeShowroomGraphics].animationStride;
+  const updatePose=animationStride===1||previewFrameCount%animationStride===0;
+  updatePreviewAudio(activePreview,totalElapsed,elapsed,cycleDuration);
+  if(!updatePose){animationFrame=requestAnimationFrame(updateAnimationPreview);return;}
   resetExhibitPose(exhibit);resetDummyPose();
   if(action==="idle")applyEnemyPose(exhibit,{elapsed});
   else if(action==="walk")applyEnemyPose(exhibit,{elapsed,movementAmount:1,walkPhase:elapsed*exhibit.speed*4.2});
@@ -453,11 +526,11 @@ function updateAnimationPreview(now){
   else if(action==="skill")animateSkill(exhibit,elapsed,cycleDuration);
   else if(action==="stunned")applyEnemyPose(exhibit,{elapsed,stunnedProgress:elapsed/cycleDuration});
   else if(action==="death")applyEnemyDeathPose(exhibit,elapsed);
-  updatePreviewAudio(activePreview,totalElapsed,elapsed,cycleDuration);
   render();animationFrame=requestAnimationFrame(updateAnimationPreview);
 }
 
 const backgroundToggle=document.querySelector("#background-toggle");
+const showroomGraphicsSelect=document.querySelector("#showroom-graphics");
 let whiteEnvironment=false;
 
 function updateEnvironment(){
@@ -523,6 +596,14 @@ addEventListener("blur",()=>movementKeys.clear());
 controls.addEventListener("change",render);
 document.querySelector("#show-enemy").addEventListener("click",applyEnemyFilter);
 backgroundToggle.addEventListener("click",()=>{whiteEnvironment=!whiteEnvironment;updateEnvironment();});
+showroomGraphicsSelect.value=showroomGraphicsMode;
+showroomGraphicsSelect.addEventListener("change",()=>{
+  const requested=showroomGraphicsSelect.value;
+  showroomGraphicsMode=requested==="auto"||SHOWROOM_GRAPHICS[requested]?requested:"auto";
+  showroomAutoResolution=1;autoQualityStartedAt=0;autoQualityFrames=0;
+  try{localStorage.setItem(GRAPHICS_STORAGE_KEY,showroomGraphicsMode);}catch{}
+  applyShowroomGraphics(showroomGraphicsMode==="auto"?detectShowroomGraphics():showroomGraphicsMode);
+});
 document.querySelector("#front-view").addEventListener("click",()=>{
   const selected=exhibits.find((exhibit)=>exhibit.id===selectedEnemyId);
   if(selected){if(dummyActive)targetLaneView(selected,dummyBasePosition.z);else selectedView(selected);}else setView(ALL_ENEMIES_FRONT_VIEW);
@@ -540,4 +621,5 @@ addEventListener("resize",()=>{
   renderer.setPixelRatio(showroomPixelRatio());renderer.setSize(innerWidth,innerHeight);render();
 });
 
+applyShowroomGraphics(activeShowroomGraphics);
 setView(ALL_ENEMIES_VIEW);

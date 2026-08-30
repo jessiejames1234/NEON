@@ -10,5 +10,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"titan-guardian",flying:false,surface:"metal",hazardArmor:true},
 sound:{base:46,wave:"sawtooth",attack:1.2,recipe:"titan",signature},
   animations:{idleDuration:3,locomotion:"walk",locomotionDuration:2.4,attackDuration:2.2,skillDuration:2.5,skillMotion:"stomp",stunnedDuration:2.2,deathDuration:2.4},
-skill:{name:"Titan Stomp",handler:"titanStomp",cooldown:10,color:0xff4d55,targetDistance:10,projectile:false,indicator:{type:"damage",radius:10,anchor:"self"}},
+skill:{name:"Titan Stomp",handler:"titanStomp",cooldown:10,maxRange:10,requiresLineOfSight:true,color:0xff4d55,targetDistance:10,projectile:false,indicator:{type:"damage",radius:10,anchor:"self"}},
 });

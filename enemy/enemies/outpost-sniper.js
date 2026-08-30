@@ -10,5 +10,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"outpost-sniper",flying:false,surface:"metal",hazardArmor:true},
 sound:{base:520,wave:"sawtooth",attack:2.3,recipe:"sniper",signature},
   animations:{idleDuration:3,locomotion:"walk",locomotionDuration:2.4,attackDuration:2.2,skillDuration:2.7,skillMotion:"sniper",stunnedDuration:2.2,deathDuration:2.4},
-skill:{name:"Sniper Laser",handler:"sniperLaser",cooldown:9,color:0xff334f,targetDistance:10,projectile:true,indicator:{type:"damage",radius:1,anchor:"target"}},
+skill:{name:"Sniper Laser",handler:"sniperLaser",cooldown:9,maxRange:18,requiresLineOfSight:true,color:0xff334f,targetDistance:10,projectile:true,indicator:{type:"damage",radius:1,anchor:"target"}},
 });

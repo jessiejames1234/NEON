@@ -109,5 +109,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"broken-drone",flying:true,surface:"metal",hazardArmor:false},
 sound:{base:245,wave:"sine",attack:1.8,recipe:"glitch",signature},
   animations:{idleDuration:3,locomotion:"hover",locomotionDuration:2.4,attackDuration:2.2,skillDuration:2.4,skillMotion:"rangedBurst",stunnedDuration:2.2,deathDuration:2.4},
-  skill:{name:"Barrage",handler:"brokenDroneBarrage",cooldown:8,color:0x68e7ff,targetDistance:10,projectile:true},
+  skill:{name:"Barrage",handler:"brokenDroneBarrage",cooldown:8,maxRange:10,requiresLineOfSight:true,color:0x68e7ff,targetDistance:10,projectile:true},
 });

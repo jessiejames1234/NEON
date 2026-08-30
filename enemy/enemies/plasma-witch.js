@@ -9,5 +9,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"plasma-witch",flying:true,surface:"organic",hazardArmor:false},
 sound:{base:390,wave:"triangle",attack:1.9,recipe:"plasma",signature},
   animations:{idleDuration:3,locomotion:"hover",locomotionDuration:2.4,attackDuration:2.2,skillDuration:2.8,skillMotion:"gravityOrb",stunnedDuration:2.2,deathDuration:2.4},
-skill:{name:"Gravity Orb",handler:"gravityOrb",cooldown:10,color:0xea62ff,targetDistance:10,projectile:true,indicator:{type:"damage",radius:5,anchor:"target"}},
+skill:{name:"Gravity Orb",handler:"gravityOrb",cooldown:10,maxRange:13,requiresLineOfSight:true,color:0xea62ff,targetDistance:10,projectile:true,indicator:{type:"damage",radius:5,anchor:"target"}},
 });

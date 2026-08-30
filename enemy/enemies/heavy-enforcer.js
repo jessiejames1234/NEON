@@ -10,5 +10,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"heavy-enforcer",flying:false,surface:"metal",hazardArmor:true},
   sound:{base:58,wave:"square",attack:1.5,recipe:"heavy",signature},
   animations:{idleDuration:3,locomotion:"walk",locomotionDuration:2.4,attackDuration:2.2,skillDuration:2.7,skillMotion:"barrage",stunnedDuration:2.2,deathDuration:2.4},
-  skill:{name:"Minigun Burst",handler:"minigunBurst",cooldown:9,color:0xffad46,targetDistance:10,projectile:false},
+  skill:{name:"Minigun Burst",handler:"minigunBurst",cooldown:9,maxRange:12,requiresLineOfSight:true,color:0xffad46,targetDistance:10,projectile:false},
 });

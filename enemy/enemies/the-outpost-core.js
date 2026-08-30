@@ -9,5 +9,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"the-outpost-core",flying:true,surface:"metal",hazardArmor:true},
   sound:{base:38,wave:"sawtooth",attack:2.2,recipe:"core",signature},
   animations:{idleDuration:3,locomotion:"hover",locomotionDuration:2.4,attackDuration:2.2,skillDuration:3,skillMotion:"core",stunnedDuration:2.2,deathDuration:2.4},
-skill:{name:"Core Protocol",handler:"coreProtocol",cooldown:7,color:0xff2f68,targetDistance:10,projectile:false,indicator:{type:"damage",radius:7,anchor:"target"}},
+skill:{name:"Core Protocol",handler:"coreProtocol",cooldown:7,maxRange:16,requiresLineOfSight:true,color:0xff2f68,targetDistance:10,projectile:false,indicator:{type:"damage",radius:7,anchor:"target"}},
 });

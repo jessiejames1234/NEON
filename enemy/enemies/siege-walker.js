@@ -9,5 +9,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"siege-walker",flying:false,surface:"metal",hazardArmor:true},
   sound:{base:52,wave:"sawtooth",attack:0.8,recipe:"siege",signature},
   animations:{idleDuration:3,locomotion:"walk",locomotionDuration:2.4,attackDuration:2.2,skillDuration:2.8,skillMotion:"bombardment",stunnedDuration:2.2,deathDuration:2.4},
-skill:{name:"Bombardment",handler:"bombardment",cooldown:11,color:0xff9b42,targetDistance:10,projectile:true,indicator:{type:"damage",radius:1.5,anchor:"target"}},
+skill:{name:"Bombardment",handler:"bombardment",cooldown:11,maxRange:15,requiresLineOfSight:true,color:0xff9b42,targetDistance:10,projectile:true,indicator:{type:"damage",radius:1.5,anchor:"target"}},
 });

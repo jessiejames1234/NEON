@@ -126,13 +126,6 @@ button, kbd { font: inherit; }
 .menu-run-info strong { color:#b9cdcf; font:700 9px Inter,sans-serif; letter-spacing:.1em; }
 
 .auth-overlay { z-index:40; background:radial-gradient(circle at 72% 42%,rgba(30,109,122,.2),transparent 32%),linear-gradient(100deg,rgba(2,8,13,.98),rgba(3,12,18,.9)); }
-.session-loading { z-index:41; background:radial-gradient(circle at 50% 45%,rgba(30,109,122,.15),transparent 34%),#02080d; }
-.session-loading-panel { width:min(470px,100%); text-align:center; }
-.session-loading-panel strong { display:block; color:var(--white); font:800 clamp(30px,5vw,48px) "Barlow Condensed",sans-serif; letter-spacing:.08em; }
-.session-loading-panel span { display:block; margin-top:8px; color:var(--muted); font-size:11px; letter-spacing:.08em; }
-.session-loading-panel i { display:block; width:100%; height:2px; margin-top:24px; overflow:hidden; background:rgba(67,244,208,.12); }
-.session-loading-panel i::after { content:""; display:block; width:35%; height:100%; background:var(--cyan); box-shadow:0 0 14px rgba(67,244,208,.75); animation:session-scan 1s ease-in-out infinite alternate; }
-@keyframes session-scan { from { transform:translateX(0); } to { transform:translateX(185%); } }
 .auth-panel { width:min(1380px,100%); display:grid; grid-template-columns:minmax(0,1.55fr) minmax(360px,.85fr); gap:clamp(30px,4vw,58px); align-items:center; }
 .auth-brand h1 { font-size:clamp(64px,8vw,92px); }
 .auth-brand > .auth-copy { max-width:300px; margin:26px 0 0; color:var(--muted); font-size:13px; line-height:1.6; }
@@ -328,10 +321,18 @@ kbd {
 body[data-graphics="very-low"] .helmet-reflection,
 body[data-graphics="very-low"] #speed-lines,
 body[data-graphics="low"] .helmet-reflection { display:none !important; }
-body[data-graphics="very-low"] #nano-shield-impact polygon:not(:nth-child(4n)),
-body[data-graphics="low"] #nano-shield-impact polygon:not(:nth-child(2n)) { display:none; }
 body[data-graphics="very-low"] .helmet-glass::before { opacity:.22; filter:none; }
 body[data-graphics="low"] .helmet-glass::before { opacity:.35; filter:none; }
+body[data-graphics="very-low"] #hud-vignette { box-shadow:inset 0 0 72px rgba(0,8,14,.52); }
+body[data-graphics="low"] #hud-vignette { box-shadow:inset 0 0 92px rgba(0,8,14,.58); }
+body[data-graphics="very-low"] #damage-flash,
+body[data-graphics="low"] #damage-flash { mix-blend-mode:normal; }
+body[data-graphics="very-low"] .helmet-rim,
+body[data-graphics="very-low"] .nano-shield,
+body[data-graphics="very-low"] .nano-shield.warning,
+body[data-graphics="very-low"] .nano-shield.critical { filter:none; }
+body[data-graphics="very-low"] .health-track i,
+body[data-graphics="very-low"] .nano-shield-track i { box-shadow:none; }
 
 .debug-panel {
   margin-top: 24px;
@@ -1033,6 +1034,16 @@ body:not(.play-mode) .squad-panel { display:none !important; }
     linear-gradient(rgba(45,155,255,.1),rgba(45,155,255,.1));
   animation:damage-hit .34s ease-out;
 }
+#damage-flash.shield-hit.shield-warning {
+  background:
+    radial-gradient(circle at center,transparent 28%,rgba(255,190,31,.25) 70%,rgba(120,72,0,.72) 100%),
+    linear-gradient(rgba(255,209,61,.08),rgba(255,209,61,.08));
+}
+#damage-flash.shield-hit.shield-critical {
+  background:
+    radial-gradient(circle at center,transparent 28%,rgba(255,34,61,.28) 70%,rgba(118,0,22,.78) 100%),
+    linear-gradient(rgba(255,55,78,.09),rgba(255,55,78,.09));
+}
 #damage-flash.fatal-hit {
   background:radial-gradient(circle at 50% 46%,rgba(100,0,15,.08) 8%,rgba(145,0,22,.58) 62%,rgba(0,0,0,.98) 100%);
   animation:player-fatal-visor 1.7s ease-in forwards;
@@ -1061,6 +1072,16 @@ body:not(.play-mode) .squad-panel { display:none !important; }
   stroke-width:1.6;
   vector-effect:non-scaling-stroke;
   shape-rendering:optimizeSpeed;
+}
+
+#nano-shield-impact.shield-warning polygon {
+  fill:rgba(255,190,31,.055);
+  stroke:rgba(255,225,107,.92);
+}
+
+#nano-shield-impact.shield-critical polygon {
+  fill:rgba(255,34,61,.065);
+  stroke:rgba(255,97,117,.94);
 }
 
 #nano-shield-impact.shield-hit { animation:nano-pentagon-hit .46s ease-out; }

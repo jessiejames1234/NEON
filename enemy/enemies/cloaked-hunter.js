@@ -10,5 +10,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"cloaked-hunter",flying:false,surface:"organic",hazardArmor:false},
 sound:{base:205,wave:"triangle",attack:1.25,recipe:"cloak",signature},
   animations:{idleDuration:3,locomotion:"walk",locomotionDuration:2.4,attackDuration:3.2,skillDuration:2.2,skillMotion:"shadowDash",stunnedDuration:2.2,deathDuration:2.4},
-  skill:{name:"Shadow Strike",handler:"cloakedStrike",cooldown:8,color:0x7b8fff,targetDistance:10,projectile:false},
+  skill:{name:"Shadow Strike",handler:"cloakedStrike",cooldown:8,maxRange:8,requiresLineOfSight:true,color:0x7b8fff,targetDistance:10,projectile:false},
 });

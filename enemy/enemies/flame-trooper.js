@@ -10,5 +10,5 @@ export default defineEnemy({
 model:{build:buildModel,builder:"flame-trooper",flying:false,surface:"metal",hazardArmor:true},
   sound:{base:125,wave:"sawtooth",attack:1.8,recipe:"flame",signature},
   animations:{idleDuration:3,locomotion:"walk",locomotionDuration:2.4,attackDuration:2.2,skillDuration:2.6,skillMotion:"flameWall",stunnedDuration:2.2,deathDuration:2.4},
-  skill:{name:"Flame Wall",handler:"flameWall",cooldown:9,color:0xff6a32,targetDistance:10,projectile:true},
+  skill:{name:"Flame Wall",handler:"flameWall",cooldown:9,maxRange:9,requiresLineOfSight:true,color:0xff6a32,targetDistance:10,projectile:true},
 });
