@@ -11,14 +11,14 @@
   <body>
     <main class="management-shell">
       <section id="loading-panel" class="status-panel">
-        <p>OWNER AUTHORIZATION</p>
+        <p>MANAGEMENT AUTHORIZATION</p>
         <h1>CONNECTING<span>...</span></h1>
       </section>
 
       <section id="denied-panel" class="status-panel denied hidden">
         <p>ACCESS REJECTED</p>
-        <h1>OWNER CLEARANCE REQUIRED</h1>
-        <span id="denied-message">Sign in as an owner from the game menu first.</span>
+        <h1>MANAGEMENT CLEARANCE REQUIRED</h1>
+        <span id="denied-message">Sign in as an admin or owner from the game menu first.</span>
         <a href="../index.html">RETURN TO GAME</a>
       </section>
 
@@ -27,7 +27,7 @@
           <div>
             <p>NEON OUTPOST // SECURE OPERATIONS</p>
             <h1><strong id="management-view-title">USER</strong> <span>MANAGEMENT</span></h1>
-            <small>Authenticated owner: <strong id="owner-name">---</strong></small>
+            <small>Authenticated manager: <strong id="owner-name">---</strong></small>
           </div>
           <nav>
             <button id="refresh-management" type="button">REFRESH DATA</button>
@@ -80,7 +80,7 @@
           </div>
           <div class="table-scroll">
             <table>
-              <thead><tr><th>RANK</th><th>OPERATIVE</th><th>ROLE</th><th>POINTS</th><th>WAVE</th><th>KILLS</th><th>UPDATED</th><th class="action-heading">ACTION</th></tr></thead>
+              <thead><tr><th>RANK</th><th>OPERATIVE</th><th>ROLE</th><th>POINTS</th><th>WAVE</th><th>KILLS</th><th>UPDATED</th><th id="scores-action-heading" class="action-heading">ACTION</th></tr></thead>
               <tbody id="scores-table"></tbody>
             </table>
           </div>

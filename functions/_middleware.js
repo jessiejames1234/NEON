@@ -35,7 +35,7 @@ async function currentUser(request, env) {
 
 function protectedRole(pathname) {
   if (pathname === "/flex" || pathname === "/flex.html") return "staff";
-  if (pathname === "/management" || pathname === "/management/" || pathname === "/management/index.html") return "owner";
+  if (pathname === "/management" || pathname === "/management/" || pathname === "/management/index.html") return "staff";
   return "";
 }
 

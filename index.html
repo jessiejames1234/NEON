@@ -136,16 +136,17 @@
             <div class="auth-field">
               <label for="register-password">PASSWORD</label>
               <div class="password-input">
-                <input id="register-password" name="password" type="password" autocomplete="new-password" minlength="7" maxlength="128" pattern="(?=.*[A-Za-z])(?=.*[0-9]).{7,128}" title="Use at least 7 characters with at least 1 letter and 1 number." required />
+                <input id="register-password" name="password" type="password" autocomplete="new-password" minlength="7" maxlength="16" pattern="(?=.*[A-Za-z])(?=.*[0-9]).{7,16}" title="Use 7 to 16 characters with at least 1 letter and 1 number." required />
                 <button class="password-toggle" type="button" data-password-target="register-password" aria-label="Show password" aria-pressed="false">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z"></path><circle cx="12" cy="12" r="2.8"></circle><path class="password-eye-slash" d="m4 4 16 16"></path></svg>
                 </button>
               </div>
             </div>
+            <p class="password-rule">7–16 characters, with at least 1 letter and 1 number.</p>
             <div class="auth-field">
               <label for="register-confirm-password">CONFIRM PASSWORD</label>
               <div class="password-input">
-                <input id="register-confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="7" maxlength="128" pattern="(?=.*[A-Za-z])(?=.*[0-9]).{7,128}" title="Repeat the password using at least 7 characters with at least 1 letter and 1 number." required />
+                <input id="register-confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="7" maxlength="16" pattern="(?=.*[A-Za-z])(?=.*[0-9]).{7,16}" title="Repeat the password using 7 to 16 characters with at least 1 letter and 1 number." required />
                 <button class="password-toggle" type="button" data-password-target="register-confirm-password" aria-label="Show password" aria-pressed="false">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z"></path><circle cx="12" cy="12" r="2.8"></circle><path class="password-eye-slash" d="m4 4 16 16"></path></svg>
                 </button>
@@ -183,11 +184,11 @@
           <span>ENEMY SHOWCASE</span>
           <span class="arrow" aria-hidden="true">&#9671;</span>
         </a>
+        <button id="manage-users-button" class="manage-users-button staff-feature hidden" type="button">
+          <span>MANAGEMENT</span>
+        </button>
         <button id="settings-button" class="settings-button" type="button" aria-pressed="false">
           <span>SETTINGS</span><small>AUDIO / VIDEO / NETWORK</small>
-        </button>
-        <button id="manage-users-button" class="manage-users-button owner-feature hidden" type="button">
-          <span>MANAGE USERS</span><small>OWNER ACCESS</small>
         </button>
         <div class="menu-run-info">
           <span>MISSION</span><strong>NEON OUTPOST</strong>

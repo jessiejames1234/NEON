@@ -209,6 +209,8 @@ function leaderboardRow(entry, index) {
   points.className = "leaderboard-points";
   wave.className = "leaderboard-wave";
   rank.textContent = String(index + 1).padStart(2, "0");
+  const isCurrentUser = String(authState.user?.username || "").trim().toLowerCase() === String(entry.player_name || "").trim().toLowerCase();
+  item.classList.toggle("leaderboard-current-user", isCurrentUser);
   name.textContent = entry.player_name;
   const role = String(entry.role || "player").toLowerCase();
   if (role === "admin" || role === "owner") {
@@ -216,6 +218,12 @@ function leaderboardRow(entry, index) {
     roleBadge.className = `leaderboard-role leaderboard-role-${role}`;
     roleBadge.textContent = role.toUpperCase();
     name.append(" ", roleBadge);
+  }
+  if (isCurrentUser) {
+    const currentUserLabel = document.createElement("em");
+    currentUserLabel.className = "leaderboard-current-label";
+    currentUserLabel.textContent = "(YOU)";
+    name.append(" ", currentUserLabel);
   }
   points.textContent = Number(entry.score || 0).toLocaleString();
   wave.textContent = String(entry.wave || 1);
@@ -253,7 +261,7 @@ function validRegistrationEmail(email) {
 }
 
 function validRegistrationPassword(password) {
-  return password.length >= 7 && password.length <= 128 && /[A-Za-z]/.test(password) && /\d/.test(password);
+  return password.length >= 7 && password.length <= 16 && /[A-Za-z]/.test(password) && /\d/.test(password);
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -288,7 +296,7 @@ registerForm.addEventListener("submit", async (event) => {
     return;
   }
   if (!validRegistrationPassword(password)) {
-    setAuthMessage("Password must be 7–128 characters and contain at least 1 letter and 1 number.");
+    setAuthMessage("Password must be 7–16 characters and contain at least 1 letter and 1 number.");
     return;
   }
 
@@ -299,8 +307,9 @@ registerForm.addEventListener("submit", async (event) => {
       method: "POST",
       body: JSON.stringify({ username, email, password }),
     });
-    await login(username, password);
     registerForm.reset();
+    hideVisiblePasswords(registerForm);
+    setAuthMessage("ACCOUNT SUCCESSFULLY CREATED. YOU CAN LOG IN NOW.", true);
   } catch (error) {
     setAuthMessage(error.message);
   } finally {

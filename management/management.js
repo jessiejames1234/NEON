@@ -25,6 +25,11 @@ const tableState = { usersPage: 1, scoresPage: 1, activeView: "users" };
 const PAGE_SIZE = 10;
 let editing = null;
 let activeActionToggle = null;
+let managerRole = "";
+
+function isOwner() {
+  return managerRole === "owner";
+}
 
 function setText(selector, value) {
   document.querySelector(selector).textContent = value;
@@ -88,7 +93,7 @@ function openActionDropdown(toggle, entity, record) {
   closeActionDropdown();
   activeActionToggle = toggle;
   toggle.setAttribute("aria-expanded", "true");
-  actionDropdown.append(dropdownButton("EDIT", "action-edit", "edit", entity, record));
+  if (isOwner()) actionDropdown.append(dropdownButton("EDIT", "action-edit", "edit", entity, record));
   if (entity === "user") {
     const activating = record.status === "inactive";
     actionDropdown.append(dropdownButton(
@@ -196,7 +201,7 @@ function renderScores() {
   scoresTable.replaceChildren();
   updatePagination("scores", scores.length, totalPages, tableState.scoresPage);
   if (!pageScores.length) {
-    scoresTable.append(emptyRow(8, "NO COMBAT SCORES RECORDED"));
+    scoresTable.append(emptyRow(isOwner() ? 8 : 7, "NO COMBAT SCORES RECORDED"));
     return;
   }
   pageScores.forEach((score, index) => {
@@ -211,8 +216,8 @@ function renderScores() {
       cell(String(score.wave || 1), "numeric"),
       cell(Number(score.kills || 0).toLocaleString(), "numeric"),
       cell(formatDate(score.updated_at)),
-      actionCell("score", score),
     );
+    if (isOwner()) row.append(actionCell("score", score));
     scoresTable.append(row);
   });
 }
@@ -222,10 +227,12 @@ function renderOverview(payload) {
   const scores = Array.isArray(payload.scores) ? payload.scores : [];
   records.users = users;
   records.scores = scores;
+  managerRole = String(payload.manager?.role || "").toLowerCase();
   const activeUsers = users.filter((user) => user.status === "active").length;
   const staffUsers = users.filter((user) => user.role === "admin" || user.role === "owner").length;
 
-  setText("#owner-name", payload.owner?.username || "OWNER");
+  setText("#owner-name", payload.manager?.username || "---");
+  document.querySelector("#scores-action-heading").classList.toggle("hidden", !isOwner());
   setText("#total-users", users.length.toLocaleString());
   setText("#active-users", activeUsers.toLocaleString());
   setText("#staff-users", staffUsers.toLocaleString());

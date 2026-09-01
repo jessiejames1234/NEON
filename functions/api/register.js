@@ -87,8 +87,8 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Enter a valid email address." }, 400);
   }
 
-  if (password.length < 7 || password.length > 128 || !/[a-z]/i.test(password) || !/\d/.test(password)) {
-    return json({ error: "Password must be 7–128 characters and contain at least 1 letter and 1 number." }, 400);
+  if (password.length < 7 || password.length > 16 || !/[a-z]/i.test(password) || !/\d/.test(password)) {
+    return json({ error: "Password must be 7–16 characters and contain at least 1 letter and 1 number." }, 400);
   }
 
   // Role and status deliberately do not come from the request. Public users

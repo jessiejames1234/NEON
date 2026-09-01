@@ -19,7 +19,7 @@ async function sha256Hex(value) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function getOwner(request, env) {
+async function getManager(request, env) {
   const token = readCookie(request, SESSION_COOKIE);
   if (!token) return null;
 
@@ -31,7 +31,7 @@ async function getOwner(request, env) {
       AND sessions.expires_at > ?2
       AND sessions.created_at > datetime('now', '-12 hours')
       AND users.status = 'active'
-      AND users.role = 'owner'
+      AND users.role IN ('admin', 'owner')
     LIMIT 1
   `).bind(await sha256Hex(token), Math.floor(Date.now() / 1000)).first();
 }
@@ -63,13 +63,14 @@ async function isLastActiveOwner(env, userId) {
 
 export async function onRequestGet({ request, env }) {
   try {
-    const owner = await getOwner(request, env);
-    if (!owner) return json({ error: "Owner access required." }, 403);
+    const manager = await getManager(request, env);
+    if (!manager) return json({ error: "Management access required." }, 403);
 
     const [usersResult, scoresResult] = await Promise.all([
       env.LEADERBOARD_DB.prepare(`
         SELECT id, username, email, role, status, created_at, updated_at
         FROM users
+        ${manager.role === "admin" ? "WHERE role = 'player'" : ""}
         ORDER BY created_at DESC, id DESC
         LIMIT 500
       `).all(),
@@ -94,7 +95,7 @@ export async function onRequestGet({ request, env }) {
     ]);
 
     return json({
-      owner: { id: owner.id, username: owner.username },
+      manager: { id: manager.id, username: manager.username, role: manager.role },
       users: usersResult.results ?? [],
       scores: scoresResult.results ?? [],
     });
@@ -117,8 +118,8 @@ export async function onRequestPatch({ request, env }) {
   }
 
   try {
-    const owner = await getOwner(request, env);
-    if (!owner) return json({ error: "Owner access required." }, 403);
+    const manager = await getManager(request, env);
+    if (!manager) return json({ error: "Management access required." }, 403);
 
     const id = integerInRange(body.id, 1, 2_147_483_647);
     if (!id) return json({ error: "Invalid record ID." }, 400);
@@ -133,6 +134,9 @@ export async function onRequestPatch({ request, env }) {
         "SELECT id, username, role, status FROM users WHERE id = ?1 LIMIT 1",
       ).bind(id).first();
       if (!user) return json({ error: "User not found." }, 404);
+      if (manager.role === "admin" && user.role !== "player") {
+        return json({ error: "Admins can only change player account status." }, 403);
+      }
       if (user.role === "owner" && user.status === "active" && status === "inactive" && await isLastActiveOwner(env, id)) {
         return json({ error: "The final active owner cannot be deactivated." }, 409);
       }
@@ -147,6 +151,7 @@ export async function onRequestPatch({ request, env }) {
     }
 
     if (body.entity === "user" && body.action === "edit") {
+      if (manager.role !== "owner") return json({ error: "Only an owner can edit user details." }, 403);
       const username = String(body.username || "").trim();
       const email = String(body.email || "").trim().toLowerCase();
       const role = String(body.role || "").toLowerCase();
@@ -178,6 +183,7 @@ export async function onRequestPatch({ request, env }) {
     }
 
     if (body.entity === "score" && body.action === "edit") {
+      if (manager.role !== "owner") return json({ error: "Only an owner can edit scores." }, 403);
       const points = integerInRange(body.score, 0, 1_000_000_000);
       const wave = integerInRange(body.wave, 1, 50);
       const kills = integerInRange(body.kills, 0, 1_000_000);
