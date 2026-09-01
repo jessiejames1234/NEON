@@ -74,11 +74,12 @@ export async function onRequestPost({ request, env }) {
     if (!user || user.password_algorithm !== "PBKDF2-SHA256") {
       return json({ error: "Invalid username or password." }, 401);
     }
-    if (user.status !== "active") return json({ error: "Your account is currently inactive. Please contact an administrator for assistance." }, 403);
-
     const derived = await derivePassword(password, fromBase64(user.password_salt), user.password_iterations);
     if (!equalBytes(derived, fromBase64(user.password_hash))) {
       return json({ error: "Invalid username or password." }, 401);
+    }
+    if (user.status !== "active") {
+      return json({ error: "Your account is currently inactive. Please contact an administrator for assistance." }, 403);
     }
 
     const token = toBase64(crypto.getRandomValues(new Uint8Array(32)))
