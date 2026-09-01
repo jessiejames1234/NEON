@@ -61,6 +61,21 @@ async function hashPassword(password, salt) {
   return bytesToBase64(new Uint8Array(derivedBits));
 }
 
+async function duplicateAccountMessage(env, username, email) {
+  const result = await env.LEADERBOARD_DB.prepare(`
+    SELECT username, email
+    FROM users
+    WHERE username = ?1 COLLATE NOCASE OR email = ?2 COLLATE NOCASE
+  `).bind(username, email).all();
+  const matches = result.results ?? [];
+  const usernameTaken = matches.some((user) => String(user.username).toLowerCase() === username.toLowerCase());
+  const emailTaken = matches.some((user) => String(user.email).toLowerCase() === email.toLowerCase());
+  if (usernameTaken && emailTaken) return "That username and email are already registered.";
+  if (usernameTaken) return "That username is already registered.";
+  if (emailTaken) return "That email is already registered.";
+  return "";
+}
+
 export async function onRequestPost({ request, env }) {
   if (!request.headers.get("content-type")?.includes("application/json")) {
     return json({ error: "Content-Type must be application/json." }, 415);
@@ -94,6 +109,8 @@ export async function onRequestPost({ request, env }) {
   // Role and status deliberately do not come from the request. Public users
   // must never be able to register themselves as an administrator or owner.
   try {
+    const duplicateMessage = await duplicateAccountMessage(env, username, email);
+    if (duplicateMessage) return json({ error: duplicateMessage }, 409);
     const role = "player";
     const status = "active";
     const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -138,7 +155,8 @@ export async function onRequestPost({ request, env }) {
   } catch (error) {
     const message = String(error?.message ?? error);
     if (message.includes("UNIQUE constraint failed")) {
-      return json({ error: "That username or email is already registered." }, 409);
+      const conflictMessage = await duplicateAccountMessage(env, username, email);
+      return json({ error: conflictMessage || "That username or email is already registered." }, 409);
     }
 
     console.error("Unable to register user", error);
