@@ -13,17 +13,27 @@ import {applyEnemyPose,applyEnemyDeathPose,applyCrawlerMalfunctionEffects,setEne
 import {applyEnemySkillPose,captureEnemySkillPose,getScrapBurrowGroundPosition,getScrapBurrowPhase,setEnemySkillEffectQuality} from "./enemy/skill-presentation.js";
 
 const PLAYER = Object.freeze({ eyeHeight: 1.7, radius: 0.36, walk: 5.6, sprint: 9, jump: 7.2, maxHealth: 100 });
-const ARENA_HALF = 23.5;
+const ARENA_HALF = 46;
 const MAX_WAVES = 50;
 const MAGAZINE_CAPACITY = 32;
 const CAPTURABLE_LIFETIME = 60;
 const RELOAD_DURATION = 1.9;
+const LAB_FLOOR_Y = 6;
+const LAB_STAIR_START_Z = -48;
+const LAB_STAIR_END_Z = -63;
+const LAB_MIN_Z = -94;
+const LAB_MAX_Z = -62.5;
+const LAB_MIN_X = -38;
+const LAB_MAX_X = 38;
+const LAB_STAIR_CENTERS = Object.freeze([-18,18]);
+const LAB_STAIR_HALF_WIDTH = 4.5;
+const LAB_STAIR_PLAYABLE_OVERLAP = 1.5;
 
 const PLAYABLE_AREAS = Object.freeze([
-  {minX:-ARENA_HALF,maxX:ARENA_HALF,minZ:-ARENA_HALF,maxZ:ARENA_HALF},
-  {minX:-10.1,maxX:-6.4,minZ:-30.2,maxZ:-21.8},
-  {minX:6.4,maxX:10.1,minZ:-30.2,maxZ:-21.8},
-  {minX:-16,maxX:16,minZ:-49.5,maxZ:-29},
+  {minX:-ARENA_HALF,maxX:ARENA_HALF,minZ:-49.5,maxZ:ARENA_HALF},
+  {minX:-22.5,maxX:-13.5,minZ:LAB_STAIR_END_Z-LAB_STAIR_PLAYABLE_OVERLAP,maxZ:LAB_STAIR_START_Z+LAB_STAIR_PLAYABLE_OVERLAP},
+  {minX:13.5,maxX:22.5,minZ:LAB_STAIR_END_Z-LAB_STAIR_PLAYABLE_OVERLAP,maxZ:LAB_STAIR_START_Z+LAB_STAIR_PLAYABLE_OVERLAP},
+  {minX:LAB_MIN_X,maxX:LAB_MAX_X,minZ:LAB_MIN_Z,maxZ:LAB_MAX_Z},
 ]);
 
 function insidePlayableArea(x,z,radius=0){
@@ -31,6 +41,17 @@ function insidePlayableArea(x,z,radius=0){
     x-radius>=area.minX&&x+radius<=area.maxX&&
     z-radius>=area.minZ&&z+radius<=area.maxZ
   );
+}
+
+function mapFloorHeight(x,z){
+  for(const stairCenter of LAB_STAIR_CENTERS){
+    if(Math.abs(x-stairCenter)<=LAB_STAIR_HALF_WIDTH&&z<=LAB_STAIR_START_Z&&z>=LAB_STAIR_END_Z){
+      const progress=THREE.MathUtils.clamp((LAB_STAIR_START_Z-z)/(LAB_STAIR_START_Z-LAB_STAIR_END_Z),0,1);
+      return progress*LAB_FLOOR_Y;
+    }
+  }
+  if(x>=LAB_MIN_X&&x<=LAB_MAX_X&&z<=LAB_MAX_Z&&z>=LAB_MIN_Z)return LAB_FLOOR_Y;
+  return 0;
 }
 
 const gameRoot = document.querySelector("#game");
@@ -275,6 +296,7 @@ let playerHealth = PLAYER.maxHealth;
 let deathAnimationActive = false;
 let deathAnimationStartedAt = 0;
 let deathStartY = PLAYER.eyeHeight;
+let deathFloorY = 0;
 const deathStartRotation = new THREE.Euler();
 const NANO_SHIELD_MAX = 500;
 const NANO_CELL_REPAIR = NANO_SHIELD_MAX * .15;
@@ -326,9 +348,11 @@ let nextWaveTimer;
 let waveStartedAt = 0;
 let nextWaveAt = 0;
 const spawnPoints = [
-  [-18,-21],[0,-21],[18,-21],
-  [-21,-10],[-21,0],[-21,10],[21,-10],[21,0],[21,10],
-  [-18,21],[-9,21],[0,21],[9,21],[18,21],
+  [-36,-43],[-24,-43],[24,-43],[36,-43],
+  [-43,-34],[-43,-17],[-43,0],[-43,17],[-43,34],
+  [43,-34],[43,-17],[43,0],[43,17],[43,34],
+  [-36,43],[-18,43],[0,43],[18,43],[36,43],
+  [-10,-92],[10,-92],
 ];
 const spawnGates=[];
 
@@ -369,6 +393,8 @@ function addBox(x, y, z, width, height, depth, color = 0x26343a, collidable = tr
       maxX: x + width / 2,
       minZ: z - depth / 2,
       maxZ: z + depth / 2,
+      minY: y - height / 2,
+      maxY: y + height / 2,
       height: y + height / 2,
     });
   }
@@ -411,20 +437,26 @@ function createInteractionHighlight(group,color){
 function createArenaFloorTexture() {
   const canvas=document.createElement("canvas");canvas.width=512;canvas.height=512;
   const context=canvas.getContext("2d");
-  context.fillStyle="#152329";context.fillRect(0,0,512,512);
-  for(let y=0;y<512;y+=64){
-    for(let x=0;x<512;x+=64){
-      const alternate=((x+y)/64)%2;
-      context.fillStyle=alternate?"#182a30":"#132229";context.fillRect(x+2,y+2,60,60);
-      context.strokeStyle="rgba(115,175,180,.18)";context.lineWidth=2;context.strokeRect(x+3,y+3,58,58);
-      context.fillStyle="rgba(3,10,14,.6)";
-      for(const [bx,by] of [[9,9],[53,9],[9,53],[53,53]]){context.beginPath();context.arc(x+bx,y+by,2.2,0,Math.PI*2);context.fill();}
-    }
+  const gradient=context.createLinearGradient(0,0,512,512);
+  gradient.addColorStop(0,"#07131a");gradient.addColorStop(.48,"#10232b");gradient.addColorStop(1,"#08151c");
+  context.fillStyle=gradient;context.fillRect(0,0,512,512);
+  // Large irregular megacity deck plates with district conduits and wear.
+  for(let row=0;row<10;row+=1)for(let column=0;column<10;column+=1){
+    const x=column*52+(row%2)*9,y=row*52;
+    context.fillStyle=(row+column)%3===0?"#172d35":"#11242c";
+    context.beginPath();context.roundRect(x+2,y+2,47,47,4);context.fill();
+    context.strokeStyle="rgba(105,173,183,.14)";context.lineWidth=1.2;context.stroke();
+    context.fillStyle="rgba(2,8,12,.5)";
+    for(const [bx,by] of [[8,8],[42,8],[8,42],[42,42]]){context.beginPath();context.arc(x+bx,y+by,1.7,0,Math.PI*2);context.fill();}
   }
-  context.strokeStyle="rgba(67,244,208,.22)";context.lineWidth=5;
-  context.beginPath();context.moveTo(256,0);context.lineTo(256,512);context.moveTo(0,256);context.lineTo(512,256);context.stroke();
-  context.strokeStyle="rgba(255,139,61,.3)";context.lineWidth=3;context.setLineDash([18,12]);
-  context.strokeRect(96,96,320,320);context.setLineDash([]);
+  for(const [offset,color] of [[92,"rgba(67,244,208,.25)"],[256,"rgba(78,143,255,.2)"],[420,"rgba(255,139,61,.24)"]]){
+    context.strokeStyle=color;context.lineWidth=5;context.setLineDash([20,12]);
+    context.beginPath();context.moveTo(offset,0);context.lineTo(offset,512);context.stroke();
+  }
+  context.setLineDash([]);context.strokeStyle="rgba(255,82,110,.2)";context.lineWidth=3;
+  context.beginPath();context.arc(256,256,76,0,Math.PI*2);context.stroke();
+  context.fillStyle="rgba(3,10,15,.58)";context.fillRect(190,238,132,36);
+  context.fillStyle="rgba(220,255,251,.58)";context.font="700 12px monospace";context.textAlign="center";context.fillText("STORM CITADEL",256,261);
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
   texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
   return texture;
@@ -432,118 +464,364 @@ function createArenaFloorTexture() {
 
 // Ground and navigation markings.
 const groundMaterial=material(0xffffff,.84,.12);groundMaterial.map=createArenaFloorTexture();
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(50, 50),groundMaterial);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(96, 100),groundMaterial);
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 shootableSurfaces.push(ground);
 
-const grid = new THREE.GridHelper(50, 50, 0x32605c, 0x23383a);
+const grid = new THREE.GridHelper(96, 48, 0x32605c, 0x23383a);
 grid.position.y = 0.012;
 grid.material.opacity = 0.32;
 grid.material.transparent = true;
 scene.add(grid);
 
-addStrip(0, 19.5, 7, 0.08);
-addStrip(0, -19.5, 7, 0.08);
-addStrip(-19.5, 0, 0.08, 7);
-addStrip(19.5, 0, 0.08, 7);
-
-// Four readable movement lanes and a central command seal.
-for(const offset of [-12,-6,6,12]){
-  addStrip(offset,0,.045,43,0x275f69);
-  addStrip(0,offset,43,.045,0x275f69);
+// NEON STORM CITADEL -------------------------------------------------------
+// A 92 x 96 meter megacity district built as six recognizable combat spaces.
+// Essential architecture uses simple collision volumes; layered trim, windows,
+// signs, machinery, and skyline pieces remain visual-only for stable pathfinding.
+function addCitadelShell(x,y,z,width,height,depth,color,roughness=.38,metalness=.76){
+  const mesh=new THREE.Mesh(boxGeometry(width,height,depth),material(color,roughness,metalness));
+  mesh.position.set(x,y,z);mesh.receiveShadow=true;scene.add(mesh);return mesh;
 }
-const commandSeal=new THREE.Group();commandSeal.position.y=.035;scene.add(commandSeal);
-for(const radius of [2.2,3.3,4.5]){
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(radius,.035,5,48),new THREE.MeshBasicMaterial({color:radius===3.3?0xff8b3d:0x43f4d0,transparent:true,opacity:.55}));
-  ring.rotation.x=Math.PI/2;commandSeal.add(ring);
+function addCitadelGlow(x,y,z,width,height,depth,color=0x43f4d0,opacity=.72){
+  const mesh=new THREE.Mesh(boxGeometry(width,height,depth),new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false}));
+  mesh.position.set(x,y,z);scene.add(mesh);return mesh;
 }
-for(let arm=0;arm<8;arm+=1){const angle=arm*Math.PI/4;addStrip(Math.sin(angle)*3.7,Math.cos(angle)*3.7,.08,1.25,arm%2?0x43f4d0:0xff8b3d);}
-
-// Perimeter walls. The north wall has two usable transit openings.
-addBox(-17.5, 2.5, -25, 15, 5, 1, 0x1e3035);
-addBox(0, 2.5, -25, 13, 5, 1, 0x1e3035);
-addBox(17.5, 2.5, -25, 15, 5, 1, 0x1e3035);
-addBox(0, 2.5, 25, 50, 5, 1, 0x1e3035);
-addBox(-25, 2.5, 0, 1, 5, 50, 0x1e3035);
-addBox(25, 2.5, 0, 1, 5, 50, 0x1e3035);
-
-// Industrial cover and structures.
-addBox(-10, 1.4, 10, 5.5, 2.8, 3.2, 0x35464b);
-addBox(10, 1.2, 11, 3.2, 2.4, 5.5, 0x39494d);
-addBox(-12, 2.25, -8, 3, 4.5, 7, 0x293b41);
-addBox(11, 1.75, -10, 7, 3.5, 3, 0x304248);
-addBox(0, 1.1, -2, 3.4, 2.2, 7, 0x3a484b);
-addBox(-4.8, .75, 3.8, 2.6, 1.5, 2.6, 0x48554f);
-addBox(5.4, .9, 4.5, 3.2, 1.8, 2.5, 0x415058);
-addBox(18, 1.5, 1, 2.4, 3, 7, 0x283a40);
-
-// Layered armor, service rails and readable district landmarks around the original cover.
-const coverDetails=[
-  [-10,2.95,10,4.8,.12,2.55,0x43f4d0],[10,2.5,11,2.5,.12,4.7,0xff8b3d],
-  [-12,4.62,-8,2.4,.12,6.1,0x43f4d0],[11,3.62,-10,6.1,.12,2.35,0xff8b3d],
-  [0,2.3,-2,2.7,.12,6.15,0x43f4d0],[18,3.08,1,1.75,.12,6.15,0xff8b3d],
-];
-for(const detail of coverDetails)addBox(...detail,false);
-for(const [x,z,color] of [[-16,15,0x43f4d0],[15,15,0x4e8fff],[-16,-15,0xff8b3d],[15,-15,0xff3f68]]){
-  const base=new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.55,.18,8),material(0x1d3038,.5,.55));base.position.set(x,.1,z);base.receiveShadow=true;scene.add(base);
-  const beacon=new THREE.Mesh(new THREE.OctahedronGeometry(.38,0),new THREE.MeshBasicMaterial({color}));beacon.position.set(x,1.35,z);scene.add(beacon);
-  addBox(x,.7,z,.22,1.2,.22,0x233a43,false);
-  for(let spoke=0;spoke<4;spoke+=1){const angle=spoke*Math.PI/2;addStrip(x+Math.sin(angle)*1.2,z+Math.cos(angle)*1.2,.07,1.1,color);}
+function addCitadelSign(text,x,y,z,color=0x43f4d0,scale=2.8){
+  const sign=createWorldPanel(text,color);sign.position.set(x,y,z);sign.scale.set(scale,.48,1);scene.add(sign);return sign;
 }
+const citadelDecorations=[];
+const citadelAnimatedParts=[];
+const citadelSteel=0x142a34,citadelPanel=0x263f49,citadelEdge=0x4b6870,citadelDark=0x071117;
 
-// A playable auxiliary map linked to the main outpost by two ground-level bridges.
-const auxiliaryFloor=new THREE.Mesh(new THREE.PlaneGeometry(32,20.5),groundMaterial);
-auxiliaryFloor.rotation.x=-Math.PI/2;auxiliaryFloor.position.set(0,.002,-39.25);
-auxiliaryFloor.receiveShadow=true;scene.add(auxiliaryFloor);shootableSurfaces.push(auxiliaryFloor);
-const auxiliaryGrid=new THREE.GridHelper(32,32,0x4e8fff,0x203d49);
-auxiliaryGrid.position.set(0,.014,-39.25);auxiliaryGrid.scale.z=.64;
-auxiliaryGrid.material.opacity=.3;auxiliaryGrid.material.transparent=true;scene.add(auxiliaryGrid);
-
-for(const [bridgeX,bridgeColor] of [[-8.25,0x43f4d0],[8.25,0x4e8fff]]){
-  const deck=addBox(bridgeX,-.08,-26.1,3.7,.18,8.4,0x263b43,false);
-  deck.material.roughness=.48;deck.material.metalness=.58;
-  // Reinforced undercarriage and segmented deck panels.
-  addBox(bridgeX-.92,-.28,-26.1,.18,.28,8.2,0x15272f,false);
-  addBox(bridgeX+.92,-.28,-26.1,.18,.28,8.2,0x15272f,false);
-  for(let z=-29.35;z<=-22.85;z+=1.3){
-    addBox(bridgeX,-.16,z,3.55,.12,.16,0x3b525b,false);
-    addBox(bridgeX,.025,z,2.72,.025,.045,bridgeColor,false);
+// Fortified outer shell and modular facade panels.
+addBox(0,3,46.8,95,6,.8,citadelSteel);
+// The south wall is split around two wide stair portals. The five machines
+// remain centered and unobstructed in front of the new laboratory extension.
+addBox(-34.75,3,-50.3,24.5,6,.8,citadelSteel);
+addBox(0,3,-50.3,27,6,.8,citadelSteel);
+addBox(34.75,3,-50.3,24.5,6,.8,citadelSteel);
+addBox(-47.2,3,-1.75,.8,6,96.3,citadelSteel);addBox(47.2,3,-1.75,.8,6,96.3,citadelSteel);
+for(let x=-42;x<=42;x+=7){
+  for(const z of [46.35,-49.85]){
+    if(z<0&&LAB_STAIR_CENTERS.some((center)=>Math.abs(x-center)<6))continue;
+    addCitadelShell(x,3.1,z,5.8,4.4,.12,(Math.abs(x/7)%2)?0x1b333d:0x203b44);
+    addCitadelGlow(x,4.75,z+(z>0?-.08:.08),3.5,.055,.035,z>0?0x43f4d0:0xff8b3d,.5);
   }
-  addBox(bridgeX-.5,.03,-26.1,.055,.035,7.8,bridgeColor,false);
-  addBox(bridgeX+.5,.03,-26.1,.055,.035,7.8,bridgeColor,false);
-  for(const railX of [bridgeX-1.78,bridgeX+1.78]){
-    addBox(railX,.45,-26.1,.14,.9,8.4,0x263d47,false);
-    addBox(railX,.94,-26.1,.2,.14,8.4,bridgeColor,false);
-    addBox(railX,.5,-26.1,.08,.08,8.15,0x65909a,false);
-    for(let z=-29.5;z<=-22.7;z+=1.7)addBox(railX,.7,z,.2,1.35,.2,0x314d58,false);
+}
+for(let z=-44;z<=41;z+=7){
+  for(const x of [-46.75,46.75]){
+    addCitadelShell(x,3.1,z,.12,4.4,5.8,(Math.abs(z/7)%2)?0x1b333d:0x203b44);
+    addCitadelGlow(x+(x>0?-.08:.08),4.75,z,.035,.055,3.5,x>0?0x4e8fff:0xff526e,.46);
   }
-  // Low-profile entrance pylons make the route readable without blocking the walkway.
-  for(const endZ of [-22.45,-29.72]){
-    for(const side of [-1,1]){
-      const postX=bridgeX+side*1.72;
-      addBox(postX,1.15,endZ,.28,2.3,.28,0x203944,false);
-      const lampBulb=new THREE.Mesh(new THREE.OctahedronGeometry(.16,0),new THREE.MeshBasicMaterial({color:bridgeColor}));
-      lampBulb.position.set(postX,2.25,endZ);scene.add(lampBulb);
+}
+
+// CENTRAL ENERGY TOWER PLAZA: the primary landmark and circular combat loop.
+addBox(0,1.05,2,10,2.1,10,0x243b44);
+const towerGroup=new THREE.Group();towerGroup.position.set(0,0,2);scene.add(towerGroup);
+const towerBase=new THREE.Mesh(new THREE.CylinderGeometry(5.9,6.8,.65,12),material(0x1a3039,.32,.84));towerBase.position.y=.34;towerGroup.add(towerBase);
+const towerCore=new THREE.Mesh(new THREE.CylinderGeometry(1.45,2.15,15,12),material(0x183c48,.24,.88));towerCore.position.y=8.1;towerGroup.add(towerCore);
+for(const y of [2.2,5.1,8.2,11.3,14.2]){
+  const collar=new THREE.Mesh(new THREE.TorusGeometry(2.25-(y*.025),.16,7,22),material(0x4d6870,.22,.92));collar.rotation.x=Math.PI/2;collar.position.y=y;towerGroup.add(collar);
+  const energy=new THREE.Mesh(new THREE.TorusGeometry(2.55-(y*.025),.045,6,28),new THREE.MeshBasicMaterial({color:y%2>1?0x43f4d0:0x4e8fff,transparent:true,opacity:.72}));
+  energy.rotation.x=Math.PI/2;energy.position.y=y;towerGroup.add(energy);citadelAnimatedParts.push({mesh:energy,spin:.22+y*.025,pulse:.18,baseOpacity:.62});
+}
+for(let brace=0;brace<6;brace+=1){
+  const angle=brace/6*Math.PI*2;
+  const support=new THREE.Mesh(new THREE.BoxGeometry(.42,10.5,.42),material(0x34535d,.3,.86));support.position.set(Math.cos(angle)*3.45,6,Math.sin(angle)*3.45);support.rotation.z=Math.cos(angle)*-.14;support.rotation.x=Math.sin(angle)*.14;towerGroup.add(support);
+}
+const stormOrb=new THREE.Mesh(new THREE.IcosahedronGeometry(1.15,1),new THREE.MeshBasicMaterial({color:0x8affef,transparent:true,opacity:.62}));stormOrb.position.y=16.2;towerGroup.add(stormOrb);citadelAnimatedParts.push({mesh:stormOrb,spin:.45,pulse:.3,baseOpacity:.58,bob:.18});
+for(const radius of [8,11.5,15]){
+  const plazaRing=new THREE.Mesh(new THREE.TorusGeometry(radius,.045,5,48),new THREE.MeshBasicMaterial({color:radius===11.5?0xff8b3d:0x43f4d0,transparent:true,opacity:.28}));
+  plazaRing.position.set(0,.04,2);plazaRing.rotation.x=Math.PI/2;scene.add(plazaRing);
+}
+for(let spoke=0;spoke<8;spoke+=1){const angle=spoke*Math.PI/4;addStrip(Math.sin(angle)*12,2+Math.cos(angle)*12,.08,5.5,spoke%2?0x275f69:0x6a442e);}
+addCitadelSign("STORM CORE",0,5.2,-4.1,0x43f4d0,3.3);
+
+// WEST RESEARCH LABORATORY: glass containment facade and rooftop scanners.
+addBox(-30,2.8,17,16,5.6,9,0x1b323b);
+addCitadelShell(-30,5.85,17,15.2,.42,8.4,citadelEdge);
+for(const x of [-35,-31.7,-28.3,-25]){
+  addCitadelShell(x,3.05,12.46,.18,4.3,.1,citadelEdge);
+  const pane=new THREE.Mesh(new THREE.PlaneGeometry(2.75,3.45),new THREE.MeshStandardMaterial({color:0x63dce8,emissive:0x073845,emissiveIntensity:.18,transparent:true,opacity:.26,roughness:.12,metalness:.16,depthWrite:false}));
+  pane.position.set(x+1.55,3.05,12.4);scene.add(pane);citadelDecorations.push(pane);
+}
+for(const x of [-35,-30,-25]){
+  const scanner=new THREE.Mesh(new THREE.TorusGeometry(1.05,.09,6,20),new THREE.MeshBasicMaterial({color:0x43f4d0,transparent:true,opacity:.65}));scanner.position.set(x,7.1,17);scanner.rotation.x=Math.PI/2;scene.add(scanner);
+  citadelAnimatedParts.push({mesh:scanner,spin:x<0?.28:-.28,pulse:.15,baseOpacity:.56});
+  addCitadelShell(x,6.45,17,.2,1.2,.2,citadelEdge);
+}
+for(const [x,z] of [[-38,9],[-22,20],[-35,25]]){
+  const tank=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.3,3.2,12),material(0x203c45,.26,.75));tank.position.set(x,1.65,z);scene.add(tank);
+  const liquid=new THREE.Mesh(new THREE.CylinderGeometry(.92,.98,2.3,12),new THREE.MeshBasicMaterial({color:0x43f4d0,transparent:true,opacity:.24}));liquid.position.set(x,1.75,z);scene.add(liquid);citadelDecorations.push(liquid);
+}
+
+// EAST INDUSTRIAL FOUNDRY: furnace block, stacks, pipes, and crane gantry.
+addBox(30,3,16,17,6,10,0x302d2c);
+addCitadelShell(30,6.2,16,16.2,.42,9.2,0x5a4b42);
+for(const x of [24.5,28.2,31.8,35.5]){
+  const furnace=new THREE.Mesh(new RoundedBoxGeometry(2.7,3.4,.18,3,.06),material(0x181617,.42,.78));furnace.position.set(x,2.6,10.92);scene.add(furnace);
+  addCitadelGlow(x,2.55,10.8,1.8,1.45,.04,0xff6b35,.72);
+}
+for(const x of [25.5,30,34.5]){
+  const stack=new THREE.Mesh(new THREE.CylinderGeometry(.55,.82,8,10),material(0x3d4444,.48,.7));stack.position.set(x,9.6,18.2);scene.add(stack);
+  for(const y of [7.1,10.1,13.1]){const band=new THREE.Mesh(new THREE.TorusGeometry(.62,.07,5,12),material(0x8a6744,.3,.8));band.rotation.x=Math.PI/2;band.position.set(x,y,18.2);scene.add(band);}
+}
+for(const z of [8,22]){
+  addCitadelShell(29,7.7,z,21,.38,.42,0x5b5851);
+  for(const x of [20,29,38])addCitadelShell(x,4,z,.35,7.4,.35,citadelPanel);
+}
+for(const [x,z,w,d] of [[22,2,5,3],[38,4,4,5],[25,27,6,3]]){
+  const cargo=addBox(x,1.1,z,w,2.2,d,0x55443c);addCitadelGlow(x,2.23,z,w*.66,.04,d*.5,0xff8b3d,.55);cargo.userData.citadelCover=true;
+}
+
+// WEST MARKET RUINS: layered stalls, torn awnings, signs, and broad alleys.
+for(const [x,z,rotation,color] of [[-35,-16,.08,0xff526e],[-27,-12,-.08,0x43f4d0],[-20,-19,.12,0xff8b3d],[-34,-27,-.1,0x4e8fff],[-23,-29,.06,0x43f4d0]]){
+  const stall=addBox(x,1,z,5.2,2,2.5,0x28373b);stall.rotation.y=rotation;
+  const canopy=new THREE.Mesh(new THREE.BoxGeometry(5.7,.14,3),material(0x3d4850,.5,.45));canopy.position.set(x,2.4,z);canopy.rotation.y=rotation;canopy.rotation.z=rotation*.5;scene.add(canopy);
+  const neon=addCitadelGlow(x,2.55,z+(rotation>=0?-1.52:1.52),3.5,.1,.05,color,.64);neon.rotation.y=rotation;
+  for(const side of [-1,1]){const post=addCitadelShell(x+side*2.25,1.2,z,.16,2.4,.16,citadelEdge);post.rotation.y=rotation;}
+}
+
+// EAST TRANSIT CRASH: broken rail spine and three skewed armored train cars.
+for(const x of [18.5,23.5]){addCitadelShell(x,.18,-19,.18,.35,31,0x67818a);addCitadelGlow(x,.38,-19,.05,.04,30,0x4e8fff,.44);}
+const wreckTrain=new THREE.Group();wreckTrain.position.set(29,.4,-20);wreckTrain.rotation.y=-.14;scene.add(wreckTrain);
+for(let car=0;car<3;car+=1){
+  const carBody=new THREE.Mesh(new RoundedBoxGeometry(6.2,3.15,8.2,4,.12),material(car===1?0x21465a:0x2a4854,.28,.78));carBody.position.set((car-1)*.45,1.75,(car-1)*8.7);carBody.rotation.z=(car-1)*.045;wreckTrain.add(carBody);
+  const roof=new THREE.Mesh(new RoundedBoxGeometry(5.7,.26,7.65,3,.08),material(0x648087,.23,.82));roof.position.set((car-1)*.45,3.42,(car-1)*8.7);wreckTrain.add(roof);
+  for(const side of [-1,1])for(const offset of [-2.25,0,2.25]){
+    const window=new THREE.Mesh(new THREE.BoxGeometry(.05,.72,1.48),new THREE.MeshBasicMaterial({color:car===1?0xff526e:0x4e8fff,transparent:true,opacity:.48}));window.position.set(side*3.12+(car-1)*.45,2,(car-1)*8.7+offset);wreckTrain.add(window);citadelDecorations.push(window);
+  }
+}
+// Collision blocks follow the car centers but leave a full loop around the wreck.
+for(const [x,z,w,d] of [[28.55,-28.7,5.7,6.6],[29,-20,5.7,6.6],[29.45,-11.3,5.7,6.6]])addBox(x,1.5,z,w,3,d,0x203b48);
+for(const [x,z] of [[17,-34],[39,-31],[18,-5],[39,-7]]){addCitadelShell(x,3,z,.5,6,.5,citadelPanel);addCitadelGlow(x,5.7,z,.18,.18,.18,0x4e8fff,.72);}
+
+// FLOODED SERVICE DISTRICT: shallow water, maintenance islands, and pumps.
+const floodWater=new THREE.Mesh(new THREE.PlaneGeometry(27,17),new THREE.MeshStandardMaterial({color:0x0b5061,emissive:0x062a35,emissiveIntensity:.22,roughness:.13,metalness:.28,transparent:true,opacity:.68,depthWrite:false}));
+floodWater.rotation.x=-Math.PI/2;floodWater.position.set(-2,.045,-33);scene.add(floodWater);citadelDecorations.push(floodWater);
+for(const z of [-38,-33,-28]){
+  addCitadelShell(-2,.13,z,24,.22,1.35,0x354c52);
+  addCitadelGlow(-2,.26,z,19,.025,.06,z===-33?0xff8b3d:0x43f4d0,.52);
+}
+for(const [x,z] of [[-11,-39],[7,-38],[-11,-27],[7,-26]]){
+  const pump=addBox(x,1,z,3.2,2,2.6,0x28414a);
+  const rotor=new THREE.Mesh(new THREE.TorusGeometry(.63,.09,7,18),new THREE.MeshBasicMaterial({color:0x43f4d0,transparent:true,opacity:.62}));rotor.position.set(x,1.25,z+(z<-33?1.34:-1.34));scene.add(rotor);
+  citadelAnimatedParts.push({mesh:rotor,spin:.7,pulse:.14,baseOpacity:.55});
+  pump.userData.servicePump=true;
+}
+
+// The unchanged five machines and demolition station occupy this open annex.
+for(const x of [-14,-7,0,7,14]){
+  addCitadelShell(x,5,-49.75,5.4,.15,.1,citadelEdge);
+  addCitadelGlow(x,4.65,-49.55,3.6,.07,.05,x===14?0xff4057:0x43f4d0,.62);
+}
+for(const x of [-15.5,15.5])addCitadelShell(x,3.1,-44,.34,6.2,11.2,citadelPanel);
+addCitadelSign("ROBOTICS ANNEX",0,5.5,-49.45,0x43f4d0,4.7);
+
+// SOUTH BIO-ROBOTICS LABORATORY -------------------------------------------
+// The upper wing exists on one continuous surface: smooth height sampling
+// drives movement, while detailed treads and a solid deck provide the visuals.
+const labDeckMaterial=material(0x182f38,.34,.82);
+const labFrameMaterial=material(0x42616a,.24,.9);
+const labDarkMaterial=material(0x071218,.48,.72);
+const labWhiteMaterial=material(0x829da0,.3,.65);
+const labCopperMaterial=material(0x9a6334,.3,.82);
+const labCyanMaterial=new THREE.MeshBasicMaterial({color:0x43f4d0,transparent:true,opacity:.72,depthWrite:false});
+const labBlueMaterial=new THREE.MeshBasicMaterial({color:0x4e8fff,transparent:true,opacity:.66,depthWrite:false});
+const labAmberMaterial=new THREE.MeshBasicMaterial({color:0xffb34f,transparent:true,opacity:.7,depthWrite:false});
+const labGlassMaterial=new THREE.MeshStandardMaterial({
+  color:0x6fdce8,emissive:0x082a32,emissiveIntensity:.16,roughness:.12,metalness:.12,
+  transparent:true,opacity:.2,depthWrite:false,side:THREE.DoubleSide,
+});
+
+function addLabGlass(x,y,z,width,height,depth=.05,collidable=true){
+  const glass=new THREE.Mesh(boxGeometry(width,height,depth),labGlassMaterial);
+  glass.position.set(x,y,z);scene.add(glass);shootableSurfaces.push(glass);citadelDecorations.push(glass);
+  if(collidable)obstacles.push({
+    minX:x-width/2,maxX:x+width/2,minZ:z-depth/2,maxZ:z+depth/2,
+    minY:y-height/2,maxY:y+height/2,height:y+height/2,
+  });
+  return glass;
+}
+
+// Two grand stairways remain outside the machine interaction lanes.
+const labStairLength=LAB_STAIR_START_Z-LAB_STAIR_END_Z;
+const labStairSlope=Math.atan2(LAB_FLOOR_Y,labStairLength);
+for(const stairCenter of LAB_STAIR_CENTERS){
+  const stairGroup=new THREE.Group();scene.add(stairGroup);
+  const ramp=new THREE.Mesh(
+    boxGeometry(8.75,.28,Math.hypot(labStairLength,LAB_FLOOR_Y)),
+    labDeckMaterial
+  );
+  ramp.position.set(stairCenter,LAB_FLOOR_Y/2-.1,(LAB_STAIR_START_Z+LAB_STAIR_END_Z)/2);
+  ramp.rotation.x=labStairSlope;ramp.receiveShadow=true;scene.add(ramp);shootableSurfaces.push(ramp);
+  for(let step=0;step<20;step+=1){
+    const progress=(step+.5)/20;
+    const tread=new THREE.Mesh(new RoundedBoxGeometry(8.6,.26,labStairLength/20+.08,2,.035),step%5===0?labWhiteMaterial:labDeckMaterial);
+    tread.position.set(stairCenter,progress*LAB_FLOOR_Y-.13,LAB_STAIR_START_Z-progress*labStairLength);
+    tread.receiveShadow=true;stairGroup.add(tread);shootableSurfaces.push(tread);
+    if(step%2===0){
+      for(const side of [-1,1]){
+        const postX=stairCenter+side*4.4;
+        addBox(postX,progress*LAB_FLOOR_Y+1.02,tread.position.z,.16,2.05,.2,0x3d5962);
+        const marker=new THREE.Mesh(new THREE.OctahedronGeometry(.085,0),side<0?labCyanMaterial:labBlueMaterial);
+        marker.position.set(postX,progress*LAB_FLOOR_Y+2.08,tread.position.z);scene.add(marker);citadelDecorations.push(marker);
+      }
     }
+    const stairLight=new THREE.Mesh(new THREE.BoxGeometry(6.7,.025,.045),step%4===0?labAmberMaterial:labCyanMaterial);
+    stairLight.position.set(stairCenter,progress*LAB_FLOOR_Y+.02,tread.position.z+.39);scene.add(stairLight);citadelDecorations.push(stairLight);
+  }
+  for(const side of [-1,1]){
+    const rail=new THREE.Mesh(boxGeometry(.14,.14,Math.hypot(labStairLength,LAB_FLOOR_Y)),labFrameMaterial);
+    rail.position.set(stairCenter+side*4.4,LAB_FLOOR_Y/2+2.03,(LAB_STAIR_START_Z+LAB_STAIR_END_Z)/2);
+    rail.rotation.x=labStairSlope;scene.add(rail);
+    obstacles.push({
+      minX:rail.position.x-.1,maxX:rail.position.x+.1,
+      minZ:LAB_STAIR_END_Z,maxZ:LAB_STAIR_START_Z,
+      minY:1.85,maxY:LAB_FLOOR_Y+2.2,height:LAB_FLOOR_Y+2.2,
+    });
+    const underBrace=new THREE.Mesh(boxGeometry(.32,.32,Math.hypot(labStairLength,LAB_FLOOR_Y)),labCopperMaterial);
+    underBrace.position.set(stairCenter+side*3.9,LAB_FLOOR_Y/2-.55,(LAB_STAIR_START_Z+LAB_STAIR_END_Z)/2);
+    underBrace.rotation.x=labStairSlope;scene.add(underBrace);
+  }
+  const landing=new THREE.Mesh(new RoundedBoxGeometry(9,.34,3.2,3,.06),labDeckMaterial);
+  landing.position.set(stairCenter,LAB_FLOOR_Y-.18,-64.1);landing.receiveShadow=true;scene.add(landing);shootableSurfaces.push(landing);
+}
+
+// Elevated laboratory deck and reinforced exterior shell.
+const laboratoryDeck=new THREE.Mesh(new THREE.BoxGeometry(76,.36,31.5),labDeckMaterial);
+laboratoryDeck.position.set(0,LAB_FLOOR_Y-.18,-78.25);laboratoryDeck.receiveShadow=true;scene.add(laboratoryDeck);shootableSurfaces.push(laboratoryDeck);
+for(const x of [-31,-23,-15,-7,7,15,23,31]){
+  const support=new THREE.Mesh(new THREE.BoxGeometry(.46,LAB_FLOOR_Y-.35,.46),material(0x203841,.38,.8));
+  support.position.set(x,(LAB_FLOOR_Y-.35)/2,-78.2);scene.add(support);citadelDecorations.push(support);
+}
+addBox(-38.45,9,-78.25,.9,6,32.3,citadelSteel);
+addBox(38.45,9,-78.25,.9,6,32.3,citadelSteel);
+addBox(0,9,-94.45,77.8,6,.9,citadelSteel);
+addBox(-30.5,9,-62.85,16,6,.7,citadelSteel);
+addBox(0,9,-62.85,27,6,.7,citadelSteel);
+addBox(30.5,9,-62.85,16,6,.7,citadelSteel);
+
+// Observation windows turn the shell into a recognizable laboratory.
+for(const z of [-89,-82,-75,-68]){
+  addLabGlass(-37.94,9,z,.08,3.7,4.9);
+  addLabGlass(37.94,9,z,.08,3.7,4.9);
+  for(const x of [-38,38])addCitadelGlow(x+(x<0?.08:-.08),11.2,z,.035,.055,3.8,x<0?0x43f4d0:0x4e8fff,.48);
+}
+for(const x of [-32,-24,-16,-8,0,8,16,24,32]){
+  addCitadelShell(x,12.35,-78.25,.28,.28,31.5,citadelEdge);
+  for(const z of [-91,-84,-77,-70,-65.5]){
+    const ceilingLamp=new THREE.Mesh(new THREE.BoxGeometry(4.8,.06,.42),x%16===0?labCyanMaterial:labBlueMaterial);
+    ceilingLamp.position.set(x,12.12,z);scene.add(ceilingLamp);citadelDecorations.push(ceilingLamp);
+  }
+}
+for(const z of [-91,-84,-77,-70,-64.7])addCitadelShell(0,12.45,z,76,.34,.42,citadelPanel);
+
+// Wide open stair gates retain only high framing; nothing occupies the lanes.
+for(const stairCenter of LAB_STAIR_CENTERS){
+  addCitadelShell(stairCenter,11.55,-65.25,9.2,.38,.55,citadelEdge);
+  const scanBar=addCitadelGlow(stairCenter,10.95,-65.18,6.6,.07,.035,0x43f4d0,.62);
+  citadelAnimatedParts.push({mesh:scanBar,spin:0,pulse:.2,baseOpacity:.58});
+}
+
+// Central specimen vault with a suspended bio-mechanical subject chamber.
+const specimenBase=addBox(0,6.65,-79,8.8,1.3,7.3,0x213943);
+specimenBase.userData.labSpecimenVault=true;
+for(const [x,z] of [[-4,-82],[-4,-76],[4,-82],[4,-76]]){
+  addBox(x,9,z,.24,4.8,.24,0x45636b);
+}
+for(const z of [-82.45,-75.55])addLabGlass(0,8.9,z,7.75,4.5,.08);
+for(const x of [-4.15,4.15])addLabGlass(x,8.9,-79,.08,4.5,6.75);
+const specimenTank=new THREE.Mesh(new THREE.CylinderGeometry(1.65,1.85,4.2,18),labGlassMaterial);
+specimenTank.position.set(0,8.45,-79);scene.add(specimenTank);shootableSurfaces.push(specimenTank);citadelDecorations.push(specimenTank);
+for(const y of [6.45,10.5]){
+  const collar=new THREE.Mesh(new THREE.TorusGeometry(1.78,.12,8,24),labFrameMaterial);collar.rotation.x=Math.PI/2;collar.position.set(0,y,-79);scene.add(collar);
+  const energyRing=new THREE.Mesh(new THREE.TorusGeometry(1.53,.035,6,28),labCyanMaterial.clone());energyRing.rotation.x=Math.PI/2;energyRing.position.set(0,y+(y<8?.18:-.18),-79);scene.add(energyRing);
+  citadelAnimatedParts.push({mesh:energyRing,spin:y<8?.35:-.35,pulse:.16,baseOpacity:.62});
+}
+const specimenCore=new THREE.Mesh(new THREE.IcosahedronGeometry(.72,1),new THREE.MeshBasicMaterial({color:0xa9fff1,transparent:true,opacity:.7}));
+specimenCore.position.set(0,8.5,-79);specimenCore.scale.set(.72,1.4,.72);scene.add(specimenCore);
+citadelAnimatedParts.push({mesh:specimenCore,spin:.3,pulse:.16,baseOpacity:.66,labBob:.22,baseY:8.5});
+
+// Four containment pods along the rear wall.
+for(const [x,color] of [[-28,0x43f4d0],[-18,0x4e8fff],[18,0xffb34f],[28,0x43f4d0]]){
+  const podBase=addBox(x,6.5,-89.1,4.4,1,4.2,0x203841);podBase.userData.labContainmentPod=true;
+  const podGlass=new THREE.Mesh(new THREE.CylinderGeometry(1.52,1.72,4.6,16,1,true),labGlassMaterial);
+  podGlass.position.set(x,9.1,-89.1);scene.add(podGlass);shootableSurfaces.push(podGlass);citadelDecorations.push(podGlass);
+  obstacles.push({minX:x-1.72,maxX:x+1.72,minZ:-90.82,maxZ:-87.38,minY:6.8,maxY:11.4,height:11.4});
+  for(const y of [6.8,11.4]){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.65,.1,7,22),labFrameMaterial);ring.rotation.x=Math.PI/2;ring.position.set(x,y,-89.1);scene.add(ring);
+  }
+  const scanner=new THREE.Mesh(new THREE.TorusGeometry(1.25,.035,6,24),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.68}));
+  scanner.rotation.x=Math.PI/2;scanner.position.set(x,8.8,-89.1);scene.add(scanner);citadelAnimatedParts.push({mesh:scanner,spin:.42,pulse:.18,baseOpacity:.58});
+  for(let cable=0;cable<3;cable+=1){
+    const tube=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,2.2,6),material(0x587273,.45,.65));
+    tube.position.set(x-1+cable,11.55,-89.1);scene.add(tube);citadelDecorations.push(tube);
   }
 }
 
-// Auxiliary platform perimeter, leaving two bridge-aligned entrances in its south wall.
-addBox(-16.5,2.5,-39.25,1,5,21.5,0x182e38);
-addBox(16.5,2.5,-39.25,1,5,21.5,0x182e38);
-addBox(0,2.5,-50,33,5,1,0x182e38);
-addBox(-13.25,2.5,-29.55,6.5,5,1,0x182e38);
-addBox(0,2.5,-29.55,12.8,5,1,0x182e38);
-addBox(13.25,2.5,-29.55,6.5,5,1,0x182e38);
+// Work islands, holographic analysis consoles, and server banks.
+for(const [x,z,rotation] of [[-12,-72,.08],[12,-72,-.08],[-13,-85,-.06],[13,-85,.06]]){
+  const bench=addBox(x,7.05,z,6.2,2.1,2.2,0x2d444d);bench.rotation.y=rotation;
+  const top=new THREE.Mesh(new RoundedBoxGeometry(5.7,.16,1.75,2,.04),labWhiteMaterial);top.position.set(x,8.18,z);top.rotation.y=rotation;scene.add(top);
+  const hologram=new THREE.Mesh(new THREE.PlaneGeometry(2.6,1.45),new THREE.MeshBasicMaterial({color:x<0?0x43f4d0:0x4e8fff,transparent:true,opacity:.28,side:THREE.DoubleSide,depthWrite:false}));
+  hologram.position.set(x,9.05,z);hologram.rotation.y=rotation;scene.add(hologram);citadelDecorations.push(hologram);
+  for(let control=0;control<4;control+=1)addCitadelGlow(x-1.6+control*1.05,8.3,z-.88,.48,.035,.08,control===3?0xffb34f:0x43f4d0,.6);
+}
+for(const x of [-34,34])for(const z of [-88,-81,-74,-67]){
+  const rack=addBox(x,8.65,z,3.3,5.3,2.2,0x111d24);
+  for(let row=0;row<6;row+=1){
+    addCitadelGlow(x+(x<0?1.68:-1.68),6.65+row*.72,z,.035,.12,1.45,row%3===0?0xff8b3d:0x43f4d0,.55);
+  }
+  rack.userData.labServerRack=true;
+}
 
-// Open machine bay, power relays and readable lanes on the second map.
-for(const x of [-12,0,12])addStrip(x,-39.25,.055,17.5,0x275f69);
-for(const z of [-34,-40,-46])addStrip(0,z,27,.055,z===-40?0xff8b3d:0x315f75);
-for(const [x,z,color] of [[-13.5,-47,0x43f4d0],[13.5,-47,0x4e8fff],[-13.5,-32,0xff8b3d],[13.5,-32,0x43f4d0]]){
-  addBox(x,1.5,z,.5,3,.5,0x28424c,false);
-  const bulb=new THREE.Mesh(new THREE.OctahedronGeometry(.22),new THREE.MeshBasicMaterial({color}));bulb.position.set(x,3,z);scene.add(bulb);
+// Suspended articulated examination arms above the work islands.
+for(const [x,z,phase] of [[-12,-72,0],[12,-72,1.7],[-13,-85,3.1],[13,-85,4.6]]){
+  const rig=new THREE.Group();rig.position.set(x,11.6,z);scene.add(rig);
+  const shoulder=new THREE.Mesh(new THREE.CylinderGeometry(.3,.38,.5,10),labDarkMaterial);shoulder.rotation.x=Math.PI/2;rig.add(shoulder);
+  const upper=new THREE.Mesh(new RoundedBoxGeometry(2.4,.28,.34,2,.05),labFrameMaterial);upper.position.x=.95;upper.rotation.z=-.28;rig.add(upper);
+  const elbow=new THREE.Mesh(new THREE.SphereGeometry(.26,10,7),labCopperMaterial);elbow.position.set(2.05,-.55,0);rig.add(elbow);
+  const lower=new THREE.Mesh(new RoundedBoxGeometry(.3,2.15,.3,2,.04),labWhiteMaterial);lower.position.set(2.05,-1.5,0);lower.rotation.z=.12;rig.add(lower);
+  const tool=new THREE.Mesh(new THREE.ConeGeometry(.22,.7,8),labCyanMaterial);tool.position.set(2.2,-2.7,0);tool.rotation.z=Math.PI;rig.add(tool);
+  citadelAnimatedParts.push({mesh:rig,spin:0,swing:.16,phase,baseRotationY:0});
+}
+
+// Cable trays, ventilation trunks, emergency cabinets, and floor conduits.
+for(const x of [-27,-9,9,27]){
+  addCitadelShell(x,11.75,-79,.42,.32,28.5,0x314c55);
+  for(let z=-91;z<=-66;z+=2.5){const cable=addCitadelGlow(x,11.56,z,.24,.08,1.9,x<0?0x43f4d0:0xff8b3d,.38);citadelDecorations.push(cable);}
+}
+for(const z of [-92,-78,-64.5]){
+  const duct=new THREE.Mesh(new THREE.CylinderGeometry(.52,.52,70,10),material(0x536b70,.38,.72));duct.rotation.z=Math.PI/2;duct.position.set(0,11.15,z);scene.add(duct);citadelDecorations.push(duct);
+}
+for(const [x,z] of [[-35,-93],[35,-93],[-35,-64],[35,-64]]){
+  const cabinet=addBox(x,7.55,z,1.4,2.8,.65,0x5d2830);addCitadelGlow(x,7.75,z+(z<-80?.35:-.35),.72,.12,.035,0xff4057,.75);cabinet.userData.labEmergencyCabinet=true;
+}
+for(const x of [-22,-6,6,22])addCitadelGlow(x,LAB_FLOOR_Y+.03,-78,.055,.025,28,0x43f4d0,.42);
+
+// High skyline structures frame the expanded arena without adding collision.
+for(const [x,z,w,h,d,color] of [
+  [-55,30,6,16,7,0x10242c],[55,30,7,20,6,0x0e222b],[-55,-40,7,18,7,0x101f28],[55,-40,6,15,8,0x122630],
+  [-25,55,9,13,5,0x132b34],[25,55,8,17,5,0x10252e],[-55,2,5,14,9,0x0f222a],[55,3,5,18,8,0x102731],
+]){
+  const building=addCitadelShell(x,h/2,z,w,h,d,color,.48,.52);citadelDecorations.push(building);
+  for(let floor=2;floor<h-1;floor+=2.1){const windows=addCitadelGlow(x+(x>0?-.5:.5),floor,z,w*.06,.08,d*.65,(x+z)%2?0x43f4d0:0x4e8fff,.3);citadelDecorations.push(windows);}
+}
+
+function updateCitadelMap(delta,elapsed){
+  const density=GRAPHICS_PRESETS[activeGraphicsPreset].effectDensity;
+  citadelAnimatedParts.forEach((entry,index)=>{
+    if(renderFrame%(density<.3?3:density<.7?2:1)!==0)return;
+    if(entry.swing)entry.mesh.rotation.y=(entry.baseRotationY||0)+Math.sin(elapsed*.72+(entry.phase||0))*entry.swing;
+    else entry.mesh.rotation.z+=delta*entry.spin;
+    if(entry.bob)entry.mesh.position.y=16.2+Math.sin(elapsed*1.35)*entry.bob;
+    if(entry.labBob)entry.mesh.position.y=(entry.baseY||0)+Math.sin(elapsed*1.65+index)*entry.labBob;
+    if(entry.mesh.material?.opacity!=null)entry.mesh.material.opacity=entry.baseOpacity+Math.sin(elapsed*2.6+index)*entry.pulse;
+  });
+  floodWater.material.opacity=.58+density*.12+Math.sin(elapsed*.8)*.025;
 }
 
 // Five physical squad slots: captured units are processed behind glass, one per machine.
@@ -822,41 +1100,9 @@ for(let slot=0;slot<5;slot+=1){
   trashStation={group,ring,ringMaterial,light,carryLabel,interactionHighlight,crusherDrums,crusherJaws,warningLights,screenMaterial,core,activeUntil:0,demolition:null};
   obstacles.push({minX:10.65,maxX:15.35,minZ:-41.05,maxZ:-36.85,height:4});
 }
-const bridgeSignCanvas=document.createElement("canvas");bridgeSignCanvas.width=512;bridgeSignCanvas.height=96;
-const bridgeSignContext=bridgeSignCanvas.getContext("2d");bridgeSignContext.fillStyle="rgba(3,12,18,.92)";bridgeSignContext.fillRect(0,0,512,96);
-bridgeSignContext.strokeStyle="#43f4d0";bridgeSignContext.lineWidth=5;bridgeSignContext.strokeRect(3,3,506,90);
-bridgeSignContext.fillStyle="#bffff3";bridgeSignContext.font="700 31px monospace";bridgeSignContext.textAlign="center";bridgeSignContext.fillText("AUXILIARY PLATFORM",256,59);
-const bridgeSignTexture=new THREE.CanvasTexture(bridgeSignCanvas);bridgeSignTexture.colorSpace=THREE.SRGBColorSpace;
-const bridgeSign=new THREE.Mesh(new THREE.PlaneGeometry(7.5,1.4),new THREE.MeshBasicMaterial({map:bridgeSignTexture,transparent:true,side:THREE.DoubleSide}));bridgeSign.position.set(0,4,-49.42);scene.add(bridgeSign);
-
-// Towers, overhead crossbeams and signal lights.
-for (const x of [-20, 20]) {
-  for (const z of [-20, 20]) {
-    addBox(x, 4, z, 1, 8, 1, 0x273b40);
-    const bulb = new THREE.Mesh(
-      new THREE.SphereGeometry(.14, 12, 8),
-      new THREE.MeshBasicMaterial({ color: 0x43f4d0 })
-    );
-    bulb.position.set(x,7.7,z);
-    scene.add(bulb);
-  }
-}
-addBox(0, 6.5, -18, 12, .35, .35, 0x354a4e, false);
-addBox(0, 6.5, 18, 12, .35, .35, 0x354a4e, false);
-
-// Layered perimeter panels make the arena read as a fortified outpost instead of a plain box.
-for(let coordinate=-20;coordinate<=20;coordinate+=5){
-  for(const side of [-1,1]){
-    if(side>0||Math.abs(Math.abs(coordinate)-10)>2.6)addBox(coordinate,2.4,side*24.42,4.35,3.7,.12,coordinate%10===0?0x29434a:0x22363d,false);
-    addBox(side*24.42,2.4,coordinate,.12,3.7,4.35,coordinate%10===0?0x29434a:0x22363d,false);
-    if(side>0||Math.abs(Math.abs(coordinate)-10)>2.6)addStrip(coordinate,side*23.82,2.5,.055,side>0?0x43f4d0:0xff8b3d);
-    addStrip(side*23.82,coordinate,.055,2.5,side>0?0x4e8fff:0xff526e);
-  }
-}
-
 function buildSpawnGate(point,index){
   const [x,z]=point;const edgeZ=Math.abs(z)>20;
-  const group=new THREE.Group();group.position.set(x,0,z);if(!edgeZ)group.rotation.y=Math.PI/2;scene.add(group);
+  const group=new THREE.Group();group.position.set(x,mapFloorHeight(x,z),z);if(!edgeZ)group.rotation.y=Math.PI/2;scene.add(group);
   const frameMaterial=material(index%2?0x2d444c:0x344d53,.38,.72);
   const gateColor=index%2?0xff8b3d:0x43f4d0;
   const portalMaterial=new THREE.MeshBasicMaterial({color:gateColor,transparent:true,opacity:.1,depthWrite:false,side:THREE.DoubleSide});
@@ -887,7 +1133,7 @@ function updateSpawnGates(delta,elapsed){
 const skylineDecorations=[];
 for (let i = 0; i < 18; i += 1) {
   const angle = (i / 32) * Math.PI * 2;
-  const radius = 37 + Math.random() * 10;
+  const radius = 62 + Math.random() * 16;
   const height = 4 + Math.random() * 14;
   skylineDecorations.push(addBox(Math.cos(angle) * radius, height / 2 - .5, Math.sin(angle) * radius,
     2 + Math.random() * 5, height, 2 + Math.random() * 5, 0x0d181e, false));
@@ -899,7 +1145,7 @@ const particlePositions = new Float32Array(particleCount * 3);
 for (let i = 0; i < particleCount; i += 1) {
   let x,z,clearOfGate;
   do{
-    x=(Math.random()-.5)*100;z=(Math.random()-.5)*100;
+    x=(Math.random()-.5)*100;z=LAB_MIN_Z-8+Math.random()*(ARENA_HALF-LAB_MIN_Z+16);
     clearOfGate=spawnPoints.every(([sx,sz])=>(x-sx)**2+(z-sz)**2>25);
   }while(!clearOfGate);
   particlePositions[i * 3]=x;
@@ -1039,6 +1285,8 @@ function applyGraphicsPreset(presetName,{resetSamples=true}={}){
   setEnemySkillEffectQuality(preset.effectDensity);
   const visibleSkyline=Math.ceil(skylineDecorations.length*preset.skyline);
   skylineDecorations.forEach((mesh,index)=>{mesh.visible=index<visibleSkyline;});
+  const visibleCitadelDecorations=Math.ceil(citadelDecorations.length*Math.max(.18,preset.effectDensity));
+  citadelDecorations.forEach((mesh,index)=>{mesh.visible=index<visibleCitadelDecorations;});
   enemies.forEach((enemy)=>{
     applyEnemyGraphicsDetail(enemy);
     enemy.repairDrones?.forEach((drone)=>applyRepairDroneGraphicsDetail(drone.group));
@@ -1110,7 +1358,17 @@ function keepEnemyAboveArenaFloor(enemy,clearance=.012){
     enemyFloorMeshBounds.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
     enemyFloorBounds.union(enemyFloorMeshBounds);
   }
-  if(Number.isFinite(enemyFloorBounds.min.y)&&enemyFloorBounds.min.y<clearance)enemy.group.position.y+=clearance-enemyFloorBounds.min.y;
+  const floorY=mapFloorHeight(enemy.group.position.x,enemy.group.position.z);
+  if(Number.isFinite(enemyFloorBounds.min.y)&&enemyFloorBounds.min.y<floorY+clearance)enemy.group.position.y+=floorY+clearance-enemyFloorBounds.min.y;
+}
+
+function syncEnemyMapFloor(enemy){
+  if(!enemy?.group)return;
+  const nextFloor=mapFloorHeight(enemy.group.position.x,enemy.group.position.z);
+  const previousFloor=Number.isFinite(enemy.mapFloorY)?enemy.mapFloorY:nextFloor;
+  enemy.group.position.y+=nextFloor-previousFloor;
+  enemy.mapFloorY=nextFloor;
+  enemy.animationBaseY=nextFloor;
 }
 
 function enemyRepairAnchorPosition(enemy,index,target=repairDroneAnchor){
@@ -1173,50 +1431,46 @@ function enemyRepairSurfacePosition(enemy,dronePosition,anchorPosition,target=re
 }
 
 function buildRepairDroneRoute(start,end){
-  const startCell=nearestWalkableCell(worldToNav(start.x),worldToNav(start.z));
-  const endCell=nearestWalkableCell(worldToNav(end.x),worldToNav(end.z));
-  const direct={points:[start.clone(),end.clone()],cumulative:[0,Math.hypot(end.x-start.x,end.z-start.z)]};direct.totalLength=direct.cumulative[1];
-  if(!startCell||!endCell)return direct;
-  const parents=new Int32Array(NAV_SIZE*NAV_SIZE);parents.fill(-1);
-  const queue=new Int32Array(NAV_SIZE*NAV_SIZE);let head=0,tail=0;
-  const startIndex=navIndex(startCell.x,startCell.z),endIndex=navIndex(endCell.x,endCell.z);
-  queue[tail++]=startIndex;parents[startIndex]=startIndex;
-  const directions=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
-  while(head<tail&&parents[endIndex]===-1){
-    const current=queue[head++],cx=current%NAV_SIZE,cz=Math.floor(current/NAV_SIZE);
-    for(const [dx,dz] of directions){
-      const nx=cx+dx,nz=cz+dz;if(nx<0||nz<0||nx>=NAV_SIZE||nz>=NAV_SIZE)continue;
-      const next=navIndex(nx,nz);if(!navWalkable[next]||parents[next]!==-1)continue;
-      if(dx!==0&&dz!==0&&(!navWalkable[navIndex(cx+dx,cz)]||!navWalkable[navIndex(cx,cz+dz)]))continue;
-      parents[next]=current;queue[tail++]=next;
-    }
+  const startFloor=mapFloorHeight(start.x,start.z),endFloor=mapFloorHeight(end.x,end.z);
+  const travelHover=THREE.MathUtils.clamp(Math.max(start.y-startFloor,end.y-endFloor,1.15),1.15,1.65);
+  const directClear=navigationSegmentClear(start,end,.3);
+  let gridPoints=[];
+  if(!directClear)gridPoints=buildGridRoute(start,end,false);
+  if(!directClear&&!gridPoints.length){
+    const held=start.clone();
+    return {points:[held,held.clone()],cumulative:[0,.001],totalLength:.001,reachable:false};
   }
-  if(parents[endIndex]===-1)return direct;
-  const cells=[];let current=endIndex;
-  while(current!==startIndex){cells.push(current);current=parents[current];}cells.push(startIndex);cells.reverse();
+  const horizontalPoints=[start.clone(),...gridPoints.map((point)=>point.clone())];
+  if(horizontalPoints.length===1||Math.hypot(horizontalPoints[horizontalPoints.length-1].x-end.x,horizontalPoints[horizontalPoints.length-1].z-end.z)>.01)horizontalPoints.push(end.clone());
   const points=[start.clone()];
-  let previousDx=null,previousDz=null;
-  for(let index=1;index<cells.length;index+=1){
-    const previous=cells[index-1],cell=cells[index];
-    const dx=cell%NAV_SIZE-previous%NAV_SIZE,dz=Math.floor(cell/NAV_SIZE)-Math.floor(previous/NAV_SIZE);
-    if(previousDx!==null&&(dx!==previousDx||dz!==previousDz)){
-      points.push(new THREE.Vector3(navToWorld(previous%NAV_SIZE),0,navToWorld(Math.floor(previous/NAV_SIZE))));
+  for(let segment=1;segment<horizontalPoints.length;segment+=1){
+    const from=horizontalPoints[segment-1],to=horizontalPoints[segment];
+    const horizontalDistance=Math.hypot(to.x-from.x,to.z-from.z);
+    const samples=Math.max(1,Math.ceil(horizontalDistance/.7));
+    for(let sample=1;sample<=samples;sample+=1){
+      const progress=sample/samples;
+      const point=new THREE.Vector3(
+        THREE.MathUtils.lerp(from.x,to.x,progress),
+        0,
+        THREE.MathUtils.lerp(from.z,to.z,progress)
+      );
+      point.y=mapFloorHeight(point.x,point.z)+travelHover;
+      points.push(point);
     }
-    previousDx=dx;previousDz=dz;
   }
-  if(cells.length>1){const last=cells[cells.length-1];points.push(new THREE.Vector3(navToWorld(last%NAV_SIZE),0,navToWorld(Math.floor(last/NAV_SIZE))));}
-  points.push(end.clone());
+  points[points.length-1].copy(end);
   const cumulative=[0];
-  for(let index=1;index<points.length;index+=1)cumulative.push(cumulative[index-1]+Math.hypot(points[index].x-points[index-1].x,points[index].z-points[index-1].z));
-  return {points,cumulative,totalLength:Math.max(.001,cumulative[cumulative.length-1])};
+  for(let index=1;index<points.length;index+=1)cumulative.push(cumulative[index-1]+points[index].distanceTo(points[index-1]));
+  return {points,cumulative,totalLength:Math.max(.001,cumulative[cumulative.length-1]),reachable:true};
 }
 
 function setRepairDroneRoutePosition(output,start,end,route,t){
+  if(!route?.points?.length)return output.copy(start);
+  if(route.points.length===1)return output.copy(route.points[0]);
   const travel=THREE.MathUtils.smootherstep(t,0,1),distance=route.totalLength*travel;
   let segment=1;while(segment<route.cumulative.length-1&&route.cumulative[segment]<distance)segment+=1;
   const segmentStart=route.cumulative[segment-1],segmentLength=Math.max(.001,route.cumulative[segment]-segmentStart),segmentProgress=(distance-segmentStart)/segmentLength;
   output.copy(route.points[segment-1]).lerp(route.points[segment],segmentProgress);
-  output.y=THREE.MathUtils.lerp(start.y,end.y,travel);
   return output;
 }
 
@@ -2087,10 +2341,17 @@ const hostileVisibilityPoint = new THREE.Vector3();
 const hostileProjectedPoint = new THREE.Vector3();
 const hostileVisibilityDirection = new THREE.Vector3();
 const NAV_STEP = 1.4;
-const NAV_MIN = -50.4;
-const NAV_SIZE = 55;
+const NAV_MIN = -96.6;
+const NAV_SIZE = 104;
 const navWalkable = new Uint8Array(NAV_SIZE * NAV_SIZE);
+const navWalkableLarge = new Uint8Array(NAV_SIZE * NAV_SIZE);
 const navDistance = new Int16Array(NAV_SIZE * NAV_SIZE);
+const navDistanceLarge = new Int16Array(NAV_SIZE * NAV_SIZE);
+const navigationFieldCache=new Map();
+const NAV_DIRECTIONS=Object.freeze([[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]);
+const LAB_STAIR_PORTALS=Object.freeze(LAB_STAIR_CENTERS.map((x)=>Object.freeze({
+  x,lowerZ:LAB_STAIR_START_Z+.55,middleZ:(LAB_STAIR_START_Z+LAB_STAIR_END_Z)/2,upperZ:LAB_STAIR_END_Z-.65,
+})));
 let navRefresh = 0;
 let navVersion = 0;
 let navTargetIndex = -1;
@@ -2119,17 +2380,19 @@ function buildNavigationGrid() {
   for (let z = 0; z < NAV_SIZE; z += 1) {
     for (let x = 0; x < NAV_SIZE; x += 1) {
       navWalkable[navIndex(x, z)] = enemyCollides(navToWorld(x), navToWorld(z), .52) ? 0 : 1;
+      navWalkableLarge[navIndex(x, z)] = enemyCollides(navToWorld(x), navToWorld(z), .92) ? 0 : 1;
     }
   }
+  navigationFieldCache.clear();
 }
 
-function nearestWalkableCell(startX, startZ) {
-  if (navWalkable[navIndex(startX, startZ)]) return { x: startX, z: startZ };
+function nearestWalkableCell(startX, startZ,walkable=navWalkable) {
+  if (walkable[navIndex(startX, startZ)]) return { x: startX, z: startZ };
   for (let radius = 1; radius < 6; radius += 1) {
     for (let z = startZ - radius; z <= startZ + radius; z += 1) {
       for (let x = startX - radius; x <= startX + radius; x += 1) {
         if (x < 0 || z < 0 || x >= NAV_SIZE || z >= NAV_SIZE) continue;
-        if (navWalkable[navIndex(x, z)]) return { x, z };
+        if (walkable[navIndex(x, z)]) return { x, z };
       }
     }
   }
@@ -2137,51 +2400,53 @@ function nearestWalkableCell(startX, startZ) {
 }
 
 function rebuildFlowField() {
-  navDistance.fill(-1);
   const requestedX = worldToNav(camera.position.x);
   const requestedZ = worldToNav(camera.position.z);
-  const target = nearestWalkableCell(requestedX, requestedZ);
-  if (!target) return;
-  const queue = new Int32Array(NAV_SIZE * NAV_SIZE);
-  let head = 0;
-  let tail = 0;
-  const targetIndex = navIndex(target.x, target.z);
   navTargetIndex = navIndex(requestedX, requestedZ);
   navVersion += 1;
-  navDistance[targetIndex] = 0;
-  queue[tail++] = targetIndex;
-  const directions = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  fillNavigationDistance(navWalkable,navDistance,requestedX,requestedZ);
+  fillNavigationDistance(navWalkableLarge,navDistanceLarge,requestedX,requestedZ);
+}
+
+function fillNavigationDistance(walkable,distanceField,targetX,targetZ){
+  distanceField.fill(-1);
+  const target=nearestWalkableCell(targetX,targetZ,walkable);
+  if(!target)return false;
+  const queue=new Int32Array(NAV_SIZE*NAV_SIZE);let head=0,tail=0;
+  const targetIndex=navIndex(target.x,target.z);distanceField[targetIndex]=0;queue[tail++]=targetIndex;
   while (head < tail) {
     const current = queue[head++];
     const cx = current % NAV_SIZE;
     const cz = Math.floor(current / NAV_SIZE);
-    for (const [dx, dz] of directions) {
+    for (const [dx, dz] of NAV_DIRECTIONS) {
       const nx = cx + dx;
       const nz = cz + dz;
       if (nx < 0 || nz < 0 || nx >= NAV_SIZE || nz >= NAV_SIZE) continue;
       const nextIndex = navIndex(nx, nz);
-      if (!navWalkable[nextIndex] || navDistance[nextIndex] !== -1) continue;
+      if (!walkable[nextIndex] || distanceField[nextIndex] !== -1) continue;
       if (dx !== 0 && dz !== 0 &&
-          (!navWalkable[navIndex(cx + dx, cz)] || !navWalkable[navIndex(cx, cz + dz)])) continue;
-      navDistance[nextIndex] = navDistance[current] + 1;
+          (!walkable[navIndex(cx + dx, cz)] || !walkable[navIndex(cx, cz + dz)])) continue;
+      distanceField[nextIndex] = distanceField[current] + 1;
       queue[tail++] = nextIndex;
     }
   }
+  return true;
 }
 
-function getFlowDirection(position, output) {
+function getFlowDirection(position, output,large=false) {
+  const distanceField=large?navDistanceLarge:navDistance;
   const cx = worldToNav(position.x);
   const cz = worldToNav(position.z);
   let bestX = cx;
   let bestZ = cz;
-  let bestDistance = navDistance[navIndex(cx, cz)];
+  let bestDistance = distanceField[navIndex(cx, cz)];
   for (let dz = -1; dz <= 1; dz += 1) {
     for (let dx = -1; dx <= 1; dx += 1) {
       if (dx === 0 && dz === 0) continue;
       const nx = cx + dx;
       const nz = cz + dz;
       if (nx < 0 || nz < 0 || nx >= NAV_SIZE || nz >= NAV_SIZE) continue;
-      const distance = navDistance[navIndex(nx, nz)];
+      const distance = distanceField[navIndex(nx, nz)];
       if (distance >= 0 && (bestDistance < 0 || distance < bestDistance)) {
         bestDistance = distance;
         bestX = nx;
@@ -2196,8 +2461,9 @@ function getFlowDirection(position, output) {
   return output.normalize();
 }
 
-function buildWaypointPath(position) {
-  const start = nearestWalkableCell(worldToNav(position.x), worldToNav(position.z));
+function buildWaypointPath(position,large=false) {
+  const walkable=large?navWalkableLarge:navWalkable,distanceField=large?navDistanceLarge:navDistance;
+  const start = nearestWalkableCell(worldToNav(position.x), worldToNav(position.z),walkable);
   if (!start) return [];
   const path = [];
   let cx = start.x;
@@ -2205,7 +2471,7 @@ function buildWaypointPath(position) {
   let previousDx = 99;
   let previousDz = 99;
   for (let step = 0; step < NAV_SIZE * 2; step += 1) {
-    const currentDistance = navDistance[navIndex(cx, cz)];
+    const currentDistance = distanceField[navIndex(cx, cz)];
     if (currentDistance <= 0) break;
     let bestX = cx;
     let bestZ = cz;
@@ -2217,8 +2483,8 @@ function buildWaypointPath(position) {
         const nz = cz + dz;
         if (nx < 0 || nz < 0 || nx >= NAV_SIZE || nz >= NAV_SIZE) continue;
         if (dx !== 0 && dz !== 0 &&
-            (!navWalkable[navIndex(cx + dx, cz)] || !navWalkable[navIndex(cx, cz + dz)])) continue;
-        const distance = navDistance[navIndex(nx, nz)];
+            (!walkable[navIndex(cx + dx, cz)] || !walkable[navIndex(cx, cz + dz)])) continue;
+        const distance = distanceField[navIndex(nx, nz)];
         if (distance >= 0 && distance < bestDistance) {
           bestDistance = distance;
           bestX = nx;
@@ -2242,11 +2508,13 @@ function buildWaypointPath(position) {
   return path;
 }
 
-function getWaypointDirection(enemy, output) {
-  if (enemy.pathVersion !== navVersion || !enemy.path) {
-    enemy.path = buildWaypointPath(enemy.group.position);
+function getWaypointDirection(enemy, output,radius=.42) {
+  const large=radius>.62;
+  if (enemy.pathVersion !== navVersion || !enemy.path||enemy.pathLarge!==large) {
+    enemy.path = buildWaypointPath(enemy.group.position,large);
     enemy.pathIndex = 0;
     enemy.pathVersion = navVersion;
+    enemy.pathLarge=large;
   }
   while (enemy.pathIndex < enemy.path.length) {
     const waypoint = enemy.path[enemy.pathIndex];
@@ -2255,7 +2523,138 @@ function getWaypointDirection(enemy, output) {
     if (dx * dx + dz * dz > .3) return output.set(dx, 0, dz).normalize();
     enemy.pathIndex += 1;
   }
-  return output.set(camera.position.x - enemy.group.position.x, 0, camera.position.z - enemy.group.position.z).normalize();
+  return output.set(0,0,0);
+}
+
+function navigationSegmentClear(from,to,radius){
+  const distance=Math.hypot(to.x-from.x,to.z-from.z);
+  const samples=Math.max(1,Math.ceil(distance/.35));
+  let previousFloor=mapFloorHeight(from.x,from.z);
+  for(let step=1;step<=samples;step+=1){
+    const t=step/samples,x=THREE.MathUtils.lerp(from.x,to.x,t),z=THREE.MathUtils.lerp(from.z,to.z,t);
+    const floor=mapFloorHeight(x,z);
+    if(Math.abs(floor-previousFloor)>.55||enemyCollides(x,z,radius))return false;
+    previousFloor=floor;
+  }
+  return true;
+}
+
+function navigationFieldForTarget(target,large){
+  const walkable=large?navWalkableLarge:navWalkable;
+  const requestedX=worldToNav(target.x),requestedZ=worldToNav(target.z);
+  const cell=nearestWalkableCell(requestedX,requestedZ,walkable);
+  if(!cell)return null;
+  const key=`${large?1:0}:${navIndex(cell.x,cell.z)}`;
+  if(navigationFieldCache.has(key))return navigationFieldCache.get(key);
+  const distance=new Int16Array(NAV_SIZE*NAV_SIZE);
+  if(!fillNavigationDistance(walkable,distance,cell.x,cell.z))return null;
+  const field={distance,walkable,targetCell:navIndex(cell.x,cell.z)};
+  navigationFieldCache.set(key,field);
+  if(navigationFieldCache.size>16)navigationFieldCache.delete(navigationFieldCache.keys().next().value);
+  return field;
+}
+
+function buildGridRoute(startPosition,targetPosition,large){
+  const field=navigationFieldForTarget(targetPosition,large);
+  if(!field)return [];
+  const start=nearestWalkableCell(worldToNav(startPosition.x),worldToNav(startPosition.z),field.walkable);
+  if(!start)return [];
+  const route=[];let cx=start.x,cz=start.z,previousDx=99,previousDz=99;
+  for(let step=0;step<NAV_SIZE*2;step+=1){
+    const currentDistance=field.distance[navIndex(cx,cz)];
+    if(currentDistance<=0)break;
+    let bestX=cx,bestZ=cz,bestDistance=currentDistance;
+    for(const [dx,dz] of NAV_DIRECTIONS){
+      const nx=cx+dx,nz=cz+dz;
+      if(nx<0||nz<0||nx>=NAV_SIZE||nz>=NAV_SIZE)continue;
+      if(dx!==0&&dz!==0&&(!field.walkable[navIndex(cx+dx,cz)]||!field.walkable[navIndex(cx,cz+dz)]))continue;
+      const distance=field.distance[navIndex(nx,nz)];
+      if(distance>=0&&distance<bestDistance){bestDistance=distance;bestX=nx;bestZ=nz;}
+    }
+    if(bestX===cx&&bestZ===cz)break;
+    const directionX=bestX-cx,directionZ=bestZ-cz;
+    if(directionX!==previousDx||directionZ!==previousDz||route.length===0){
+      route.push(new THREE.Vector3(navToWorld(bestX),0,navToWorld(bestZ)));
+      previousDx=directionX;previousDz=directionZ;
+    }else route[route.length-1].set(navToWorld(bestX),0,navToWorld(bestZ));
+    cx=bestX;cz=bestZ;
+  }
+  const finalFrom=route[route.length-1]||startPosition;
+  if(navigationSegmentClear(finalFrom,targetPosition,large?.92:.52))route.push(new THREE.Vector3(targetPosition.x,0,targetPosition.z));
+  return route;
+}
+
+function routeLength(start,route){
+  let length=0,previous=start;
+  for(const point of route){length+=Math.hypot(point.x-previous.x,point.z-previous.z);previous=point;}
+  return length;
+}
+
+function buildCrossFloorRoute(enemy,target,large){
+  const goingUp=mapFloorHeight(enemy.group.position.x,enemy.group.position.z)<mapFloorHeight(target.x,target.z);
+  let best=null;
+  for(const portal of LAB_STAIR_PORTALS){
+    if(enemy.navigationAvoidStair===portal.x&&clock.elapsedTime<(enemy.navigationAvoidUntil||0))continue;
+    const ordered=goingUp
+      ?[{x:portal.x,z:portal.lowerZ},{x:portal.x,z:portal.middleZ},{x:portal.x,z:portal.upperZ}]
+      :[{x:portal.x,z:portal.upperZ},{x:portal.x,z:portal.middleZ},{x:portal.x,z:portal.lowerZ}];
+    const route=[];let from=enemy.group.position,valid=true;
+    for(const destination of [...ordered,target]){
+      const segment=buildGridRoute(from,destination,large);
+      if(!segment.length){valid=false;break;}
+      route.push(...segment);from=destination;
+    }
+    if(!valid)continue;
+    const candidate={points:route,length:routeLength(enemy.group.position,route),stairCenter:portal.x};
+    if(!best||candidate.length<best.length)best=candidate;
+  }
+  return best;
+}
+
+function clearEnemyNavigationRoute(enemy){
+  enemy.navigationRoute=null;enemy.navigationRouteIndex=0;enemy.navigationTargetCell=-1;
+}
+
+function getSharedNavigationDirection(enemy,target,output,radius,{playerFlow=false}={}){
+  const large=radius>.62;
+  const sourceCell=navIndex(worldToNav(enemy.group.position.x),worldToNav(enemy.group.position.z));
+  const targetCell=navIndex(worldToNav(target.x),worldToNav(target.z));
+  const directKey=`${large?1:0}:${sourceCell}:${targetCell}`;
+  if(enemy.navigationDirectKey!==directKey||clock.elapsedTime>=(enemy.navigationDirectCheckAt||0)){
+    enemy.navigationDirectKey=directKey;
+    enemy.navigationDirectClear=navigationSegmentClear(enemy.group.position,target,radius);
+    enemy.navigationDirectCheckAt=clock.elapsedTime+GRAPHICS_PRESETS[activeGraphicsPreset].navInterval;
+  }
+  if(enemy.navigationDirectClear){
+    clearEnemyNavigationRoute(enemy);enemy.navigationRouteStair=null;
+    return output.set(target.x-enemy.group.position.x,0,target.z-enemy.group.position.z).normalize();
+  }
+  const sourceFloor=mapFloorHeight(enemy.group.position.x,enemy.group.position.z),targetFloor=mapFloorHeight(target.x,target.z);
+  const changingFloor=Math.abs(sourceFloor-targetFloor)>4.5;
+  if(playerFlow&&!changingFloor&&!large)return getWaypointDirection(enemy,output,radius);
+  if(!enemy.navigationRoute||enemy.navigationTargetCell!==targetCell||enemy.navigationRouteLarge!==large){
+    const crossFloor=changingFloor?buildCrossFloorRoute(enemy,target,large):null;
+    enemy.navigationRoute=crossFloor?.points||buildGridRoute(enemy.group.position,target,large);
+    enemy.navigationRouteStair=crossFloor?.stairCenter??null;
+    enemy.navigationRouteIndex=0;enemy.navigationTargetCell=targetCell;enemy.navigationRouteLarge=large;
+  }
+  const threshold=Math.max(.38,radius*.72);const thresholdSquared=threshold*threshold;
+  while(enemy.navigationRouteIndex<(enemy.navigationRoute?.length||0)){
+    const waypoint=enemy.navigationRoute[enemy.navigationRouteIndex];
+    const dx=waypoint.x-enemy.group.position.x,dz=waypoint.z-enemy.group.position.z;
+    if(dx*dx+dz*dz>thresholdSquared)return output.set(dx,0,dz).normalize();
+    enemy.navigationRouteIndex+=1;
+  }
+  clearEnemyNavigationRoute(enemy);
+  return output.set(0,0,0);
+}
+
+function updateEnemyNavigationProgress(enemy,wantsMovement,movedDistance,delta){
+  if(!wantsMovement||movedDistance>.018){enemy.navigationStuckFor=0;return;}
+  enemy.navigationStuckFor=(enemy.navigationStuckFor||0)+delta;
+  if(enemy.navigationStuckFor<.6)return;
+  if(enemy.navigationRouteStair!=null){enemy.navigationAvoidStair=enemy.navigationRouteStair;enemy.navigationAvoidUntil=clock.elapsedTime+2.5;}
+  clearEnemyNavigationRoute(enemy);enemy.pathVersion=-1;enemy.navigationStuckFor=0;
 }
 
 buildNavigationGrid();
@@ -2311,7 +2710,8 @@ function spawnEnemy(typeId, elite = false) {
   const spawn = pickSpawnPoint();
   const size = type.scale * (elite ? 1.2 : 1);
   group.scale.setScalar(size);
-  group.position.set(spawn.x, flying ? 1.15 : 0, spawn.z);
+  const spawnFloorY=mapFloorHeight(spawn.x,spawn.z);
+  group.position.set(spawn.x,spawnFloorY+(flying ? 1.15 : 0),spawn.z);
   // Scrap Crawler Burrow pitches around its own local X axis. YXZ keeps that
   // pitch local after gameplay yaw; default XYZ made the side/rear dive first
   // whenever the crawler was facing away from the showroom's zero-yaw angle.
@@ -2330,10 +2730,10 @@ function spawnEnemy(typeId, elite = false) {
     abilityAt: clock.elapsedTime + 3 + Math.random() * 3,
     seed: Math.random() * Math.PI * 2,
     alive: true, dying: false, deathTime: 0, attackAnimation: 0, walkPhase: Math.random() * Math.PI * 2,
-    steering: new THREE.Vector3(), path: null, pathIndex: 0, pathVersion: -1,
+    steering: new THREE.Vector3(), path: null, pathIndex: 0, pathVersion: -1, mapFloorY:spawnFloorY,
     nextIdleSound: clock.elapsedTime + (typeId === 1 ? .8 + Math.random() : 1.5 + Math.random() * 2.5),
     nextStepSound: clock.elapsedTime + (typeId === 1 ? .08 : Math.random() * .3),
-    animationBaseY: 0, baseScale: group.scale.clone(), deathBaseY: group.position.y,
+    animationBaseY: spawnFloorY, baseScale: group.scale.clone(), deathBaseY: group.position.y,
     deathBaseRotationY: group.rotation.y, deathDuration: (typeId===1||typeId===2||typeId===3)?(getEnemyDefinition(typeId).animations.deathDuration||2.4):1.2,
   };
   applyEnemyGraphicsDetail(enemy);
@@ -2491,7 +2891,7 @@ function createCaptureLabel(enemy){
   context.fillStyle="rgba(5,13,18,.9)";context.fillRect(8,8,496,96);
   context.strokeStyle="#ffd35c";context.lineWidth=5;context.strokeRect(10.5,10.5,491,91);
   context.fillStyle="#ffd35c";context.font="800 30px monospace";context.textAlign="center";context.fillText(isMobileDevice?"TAP USE TO PICK UP":"PRESS E TO PICK UP",256,59);
-  context.fillStyle="rgba(255,255,255,.68)";context.font="700 15px monospace";context.fillText("TAKE TO AUXILIARY PLATFORM",256,84);
+  context.fillStyle="rgba(255,255,255,.68)";context.font="700 15px monospace";context.fillText("TAKE TO ROBOTICS ANNEX",256,84);
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:true,depthWrite:false}));
   sprite.scale.set(1.75,.385,1);sprite.visible=false;sprite.renderOrder=45;scene.add(sprite);
@@ -2521,13 +2921,10 @@ function ensureCarryTutorialLines(){
 }
 
 function buildCarryTutorialPath(target){
-  const points=[new THREE.Vector3(camera.position.x,.07,camera.position.z)];
-  if(camera.position.z>-29&&target.z<-29){
-    const bridgeX=Math.abs(target.x+8.25)<Math.abs(target.x-8.25)?-8.25:8.25;
-    points.push(new THREE.Vector3(bridgeX,.07,-21.7),new THREE.Vector3(bridgeX,.07,-30.35));
-  }
-  points.push(new THREE.Vector3(target.x,.07,target.z));
-  return points;
+  return [
+    new THREE.Vector3(camera.position.x,.07,camera.position.z),
+    new THREE.Vector3(target.x,.07,target.z),
+  ];
 }
 
 function stopCarryTutorial(){
@@ -2595,7 +2992,9 @@ function setSquadMode(mode) {
 function makeEnemyCapturable(enemy) {
   removeHostileTracking(enemy);
   enemy.alive=false; enemy.dying=false; enemy.capturable=true; enemy.captureTimeRemaining=CAPTURABLE_LIFETIME;
-  enemy.group.visible=true; enemy.group.position.y=Math.max(0,enemy.group.position.y);
+  enemy.mapFloorY=mapFloorHeight(enemy.group.position.x,enemy.group.position.z);
+  enemy.animationBaseY=enemy.mapFloorY;
+  enemy.group.visible=true; enemy.group.position.y=Math.max(enemy.mapFloorY,enemy.group.position.y);
   enemy.group.rotation.x=0; enemy.group.rotation.z=(enemy.typeId===1||enemy.typeId===2)?0:.92;
   enemy.steering.set(0,0,0);
   removeEnemyFromHitMeshes(enemy);
@@ -2792,7 +3191,10 @@ function captureEnemy(enemy,machine=enemy?.processingMachine) {
   if(enemy.group.parent!==scene)scene.add(enemy.group);
   enemy.group.userData.actualCarriedEnemy=null;
   enemy.group.scale.setScalar(enemy.originalWorldScale||enemy.type.scale);
-  enemy.group.rotation.set(0,enemy.group.rotation.y,0);enemy.group.position.set(machine.group.position.x,enemy.flying?1.15:0,machine.group.position.z+2.4);enemy.group.visible=true;
+  const releaseX=machine.group.position.x,releaseZ=machine.group.position.z+2.4;
+  enemy.mapFloorY=mapFloorHeight(releaseX,releaseZ);
+  enemy.animationBaseY=enemy.mapFloorY;
+  enemy.group.rotation.set(0,enemy.group.rotation.y,0);enemy.group.position.set(releaseX,enemy.mapFloorY+(enemy.flying?1.15:0),releaseZ);enemy.group.visible=true;
   if(storedDisplay){machine.group.add(storedDisplay);machine.display=storedDisplay;}
   machine.processingEnemy=null;machine.readyAt=0;machine.tamedEnemy=enemy;enemy.machineSlot=machine.index;
   addTamedAura(enemy);
@@ -3270,13 +3672,13 @@ function fireEnemyProjectile(enemy, homing = false) {
     enemy.type.style === "rocket" ? 0xff8b3d : enemy.type.color;
   const mesh = new THREE.Mesh(projectileGeometry, projectileMaterial(color));
   const start = enemy.group.position.clone();
-  start.y = enemy.flying ? enemy.group.position.y + .5 : Math.max(1, enemy.type.scale);
+  start.y = enemy.flying ? enemy.group.position.y + .5 : enemy.mapFloorY + Math.max(1, enemy.type.scale);
   mesh.position.copy(start);
   scene.add(mesh);
-  const target = new THREE.Vector3(camera.position.x, PLAYER.eyeHeight * .75, camera.position.z);
+  const target = new THREE.Vector3(camera.position.x, camera.position.y-PLAYER.eyeHeight*.25, camera.position.z);
   const direction = target.sub(start).normalize();
   const speed = enemy.type.style === "sniper" ? 17 : enemy.type.style === "rocket" ? 5 : 8;
-  enemyProjectiles.push({ mesh, direction, speed, damage: enemy.damage, homing, life: 5 });
+  enemyProjectiles.push({ mesh, direction, speed, damage: enemy.damage, homing, life: 5, previousPosition:start.clone() });
 }
 
 const nanoCellGeometry=new THREE.DodecahedronGeometry(.28,0);
@@ -3286,11 +3688,13 @@ const nanoCellMarkerGeometry=new THREE.ConeGeometry(.12,.3,5);
 const nanoCellRingMaterial=new THREE.MeshBasicMaterial({color:0x83ccff,transparent:true,opacity:.72,depthWrite:false,blending:THREE.AdditiveBlending});
 
 function spawnNanoCell(position){
-  const group=new THREE.Group();group.position.set(position.x,.55,position.z);
+  const floorY=mapFloorHeight(position.x,position.z);
+  const baseY=floorY+.55;
+  const group=new THREE.Group();group.position.set(position.x,baseY,position.z);
   const core=new THREE.Mesh(nanoCellGeometry,nanoCellMaterial);core.scale.set(.72,1.18,.72);group.add(core);
   const ring=new THREE.Mesh(nanoCellRingGeometry,nanoCellRingMaterial);ring.rotation.x=Math.PI/2;group.add(ring);
   const marker=new THREE.Mesh(nanoCellMarkerGeometry,nanoCellRingMaterial);marker.position.y=.75;marker.rotation.z=Math.PI;group.add(marker);
-  scene.add(group);nanoDrops.push({group,core,ring,baseY:.55});
+  scene.add(group);nanoDrops.push({group,core,ring,floorY,baseY});
 }
 
 function removeNanoCell(index){
@@ -3307,7 +3711,9 @@ function updateNanoCells(delta,elapsed){
     const drop=nanoDrops[index];
     drop.group.position.y=drop.baseY+Math.sin(elapsed*3+index)*.12;
     drop.core.rotation.y+=delta*2.4;drop.core.rotation.x+=delta*.8;drop.ring.rotation.z+=delta*1.7;
-    if(gameplayActive()&&nanoShield<NANO_SHIELD_MAX&&playerDistanceTo(drop.group.position)<1.45){
+    const playerFeetY=camera.position.y-PLAYER.eyeHeight;
+    const onSameLevel=Math.abs(playerFeetY-drop.floorY)<1.35;
+    if(gameplayActive()&&nanoShield<NANO_SHIELD_MAX&&onSameLevel&&playerDistanceTo(drop.group.position)<1.45){
       const restored=Math.min(NANO_CELL_REPAIR,NANO_SHIELD_MAX-nanoShield);
       nanoShield+=restored;updateHealthHud();
       tone(520,.1,.075,"sine");tone(880,.2,.06,"triangle",sfxBus,.06);
@@ -3483,7 +3889,8 @@ function combatAbilityColor(enemy){
 }
 
 function createAbilityEffect(kind, position, options = {}) {
-  const visual=createAbilityVisual(scene,kind,position,options),mesh=visual.mesh;
+  const visualOptions={...options,floorY:mapFloorHeight(position.x,position.z)};
+  const visual=createAbilityVisual(scene,kind,position,visualOptions),mesh=visual.mesh;
   const effect = {
     ...visual,damage: options.damage ?? 0,
     owner: options.owner ?? null, target: options.target ?? null, activeAfter: options.activeAfter ?? 0, tickAt: 0,
@@ -3572,7 +3979,7 @@ function updateAbilityEffects(delta) {
   for (let i = abilityEffects.length - 1; i >= 0; i -= 1) {
     const effect = abilityEffects[i];
     if (!effect) continue;
-    if(effect.kind==="radiation-pack"&&effect.owner?.group){effect.mesh.position.copy(effect.owner.group.position);effect.mesh.position.y=.04;}
+    if(effect.kind==="radiation-pack"&&effect.owner?.group){effect.mesh.position.copy(effect.owner.group.position);effect.mesh.position.y=mapFloorHeight(effect.mesh.position.x,effect.mesh.position.z)+.04;}
     const visualStride=GRAPHICS_PRESETS[activeGraphicsPreset].abilityVisualStride;
     const precisionVisual=effect.kind==="scrap-burrow"||effect.kind==="scrap-emerge";
     const animateVisual=precisionVisual||visualStride===1||(renderFrame+i)%visualStride===0;
@@ -3609,7 +4016,8 @@ function updateAbilityEffects(delta) {
       const waveRadius = effect.radius * Math.min(1, effect.age / effect.life);
       effect.mesh.scale.set(waveRadius * 2, 1, waveRadius * 2);
       const distance = combatTargetDistance(effect.target,effect.mesh.position);
-      const targetCanBeHit=effect.target ? true : camera.position.y < PLAYER.eyeHeight + .7;
+      const localFloorY=mapFloorHeight(camera.position.x,camera.position.z);
+      const targetCanBeHit=effect.target ? true : camera.position.y < localFloorY+PLAYER.eyeHeight+.7;
       if (!effect.hitPlayer && distance <= waveRadius && distance >= waveRadius - 1 && targetCanBeHit) {
         effect.hitPlayer = true;
         damageCombatTarget(effect.target,effect.damage,"Titan shockwave",effect.owner);
@@ -3656,7 +4064,12 @@ function teleportNearCombatTarget(enemy, target = null, behind = false) {
   const side = Math.random() > .5 ? 1 : -1;
   const nx = targetPosition.x + (behind ? -forward.x * 2.4 : -forward.z * side * 4.5);
   const nz = targetPosition.z + (behind ? -forward.z * 2.4 : forward.x * side * 4.5);
-  if (!enemyCollides(nx, nz, .55)) enemy.group.position.set(nx, enemy.flying ? 1.15 : 0, nz);
+  if (!enemyCollides(nx, nz, .55)) {
+    const floorY=mapFloorHeight(nx,nz);
+    enemy.group.position.set(nx,floorY+(enemy.flying?1.15:0),nz);
+    enemy.mapFloorY=floorY;
+    enemy.animationBaseY=floorY;
+  }
   enemy.steering.set(0,0,0);
   enemy.pathVersion = -1;
 }
@@ -3853,7 +4266,7 @@ function findSafeCrawlerEmergence(enemy,target){
   }
   // The current standing point was valid before the ability began, making it
   // the safest final fallback if the surrounding map has no usable cell.
-  return {position:new THREE.Vector3(fromX,-.78,fromZ),yaw:targetYaw};
+  return {position:new THREE.Vector3(fromX,mapFloorHeight(fromX,fromZ)-.78,fromZ),yaw:targetYaw};
 }
 
 function updateScrapCrawlerBurrow(enemy, delta, elapsed) {
@@ -3876,7 +4289,7 @@ function updateScrapCrawlerBurrow(enemy, delta, elapsed) {
       state.phase = "travel";
       removeEnemyFromHitMeshes(enemy);
       enemy.group.visible = false;
-      enemy.group.position.y = -.78;
+      enemy.group.position.y = mapFloorHeight(enemy.group.position.x,enemy.group.position.z)-.78;
       enemy.group.rotation.x = .65;
       const safeEmergence=findSafeCrawlerEmergence(enemy,state.target);
       state.emergePosition=safeEmergence.position;
@@ -3886,7 +4299,8 @@ function updateScrapCrawlerBurrow(enemy, delta, elapsed) {
       playScrapBurrowSound(enemy, "travel");
     }
     setRepairDroneRoutePosition(enemy.group.position,state.travelRoute.points[0],state.emergePosition,state.travelRoute,burrowPhase.progress);
-    enemy.group.position.y=-.78;
+    enemy.mapFloorY=mapFloorHeight(enemy.group.position.x,enemy.group.position.z);
+    enemy.group.position.y=enemy.mapFloorY-.78;
     const travelDx=enemy.group.position.x-state.travelPreviousPosition.x,travelDz=enemy.group.position.z-state.travelPreviousPosition.z;
     if(Math.hypot(travelDx,travelDz)>.001)enemy.group.rotation.y=Math.atan2(travelDx,travelDz);
     state.travelPreviousPosition.copy(enemy.group.position);
@@ -3915,7 +4329,8 @@ function updateScrapCrawlerBurrow(enemy, delta, elapsed) {
     const definition=getEnemyDefinition(enemy.typeId);
     applyEnemySkillPose(enemy,definition,definition.animations.skillDuration,definition.animations.skillDuration);
     enemy.group.visible = true;
-    enemy.group.position.y = 0;
+    enemy.mapFloorY=mapFloorHeight(enemy.group.position.x,enemy.group.position.z);
+    enemy.group.position.y = enemy.mapFloorY;
     enemy.group.rotation.x = 0;
     enemy.group.rotation.z = 0;
     enemy.parts.legs.forEach((leg) => {
@@ -4089,9 +4504,10 @@ function updateCompanionRepairDrones(enemy,delta,elapsed,repairProgress){
   const visibleDroneCount=GRAPHICS_PRESETS[activeGraphicsPreset].repairDrones;
   enemy.repairDrones.forEach((drone,index)=>{
     const droneVisible=index<visibleDroneCount;
-    drone.group.visible=droneVisible;
-    if(linkedMachine?.droneDocks?.[index])linkedMachine.droneDocks[index].droneModel.visible=!droneVisible;
-    if(!droneVisible){
+    const routeBlocked=drone.deployRoute?.reachable===false;
+    drone.group.visible=droneVisible&&!routeBlocked;
+    if(linkedMachine?.droneDocks?.[index])linkedMachine.droneDocks[index].droneModel.visible=!droneVisible||routeBlocked;
+    if(!droneVisible||routeBlocked){
       drone.beam.visible=false;drone.contactGlow.visible=false;drone.contactRing.visible=false;
       drone.repairSparks.forEach((spark)=>{spark.visible=false;});
       return;
@@ -4224,6 +4640,13 @@ function updateReturningCompanionRepairDrones(enemy,delta,elapsed){
     drone.group.visible=droneVisible;
     const linkedMachine=tamingMachines[enemy.machineSlot];
     if(linkedMachine?.droneDocks?.[index])linkedMachine.droneDocks[index].droneModel.visible=!droneVisible;
+    if(drone.returnRoute?.reachable===false){
+      drone.group.visible=false;
+      if(linkedMachine?.droneDocks?.[index])linkedMachine.droneDocks[index].droneModel.visible=true;
+      drone.beam.visible=false;drone.contactGlow.visible=false;drone.contactRing.visible=false;
+      drone.repairSparks.forEach((spark)=>{spark.visible=false;});
+      return;
+    }
     const progress=Math.min(1,returnAge/drone.returnDuration);
     allDocked=allDocked&&progress>=1;
     setRepairDroneRoutePosition(drone.group.position,drone.returnStartPosition,drone.returnTarget,drone.returnRoute,progress);
@@ -4266,7 +4689,7 @@ function damageTamedEnemy(enemy, amount, source) {
     enemy.group.updateMatrixWorld(true);
     createCompanionRepairDrones(enemy);
     if(enemy.typeId===1){playEnemySound(enemy,"stunned");enemy.nextCrawlerStunnedSound=clock.elapsedTime+1.05;}
-    if(enemy.typeId===1&&enemy.burrowState){enemy.burrowState=null;enemy.group.visible=true;enemy.group.position.y=0;removeScrapBurrowMarker(enemy);}
+    if(enemy.typeId===1&&enemy.burrowState){enemy.burrowState=null;enemy.group.visible=true;enemy.mapFloorY=mapFloorHeight(enemy.group.position.x,enemy.group.position.z);enemy.group.position.y=enemy.mapFloorY;removeScrapBurrowMarker(enemy);}
     worldTone(enemy.group,175,.32,.09,"sawtooth");worldTone(enemy.group,88,.45,.075,"square",sfxBus,.12);
     speakSquadAlert(`${enemy.type.name} is down. Repairs are underway.`);
     statusEl.textContent=`${enemy.type.name} downed - repairing for 20 seconds`;
@@ -4284,41 +4707,27 @@ function nearestHostile(position) {
   return {target,distance:best};
 }
 
-function companionTransitTarget(position,target){
-  const fromMain=position.z>-23.2;
-  const fromAuxiliary=position.z<-29.4;
-  const targetMain=target.z>-23.2;
-  const targetAuxiliary=target.z<-29.4;
-  if((fromMain&&targetAuxiliary)||(fromAuxiliary&&targetMain)){
-    const bridgeX=Math.abs(position.x+8.25)+Math.abs(target.x+8.25)<Math.abs(position.x-8.25)+Math.abs(target.x-8.25)?-8.25:8.25;
-    // Put the entrance waypoint beyond the region boundary. Previously the
-    // main waypoint (-23.05) remained inside `fromMain` (> -23.2), and the
-    // auxiliary waypoint (-29.25) remained inside `fromAuxiliary` (< -29.4).
-    // The .2 stopping distance therefore let companions stop forever without
-    // advancing to the bridge-crossing stage.
-    return {x:bridgeX,z:fromMain?-23.55:-29.05};
-  }
-  if(!fromMain&&!fromAuxiliary)return {x:position.x<0?-8.25:8.25,z:targetAuxiliary?-30:-22.8};
-  return target;
-}
-
 function moveCompanionToward(enemy, target, delta, stopDistance) {
-  const travelTarget=companionTransitTarget(enemy.group.position,target);
-  const crossing=travelTarget!==target;
-  const dx=travelTarget.x-enemy.group.position.x,dz=travelTarget.z-enemy.group.position.z;
-  const distance=Math.max(.01,Math.hypot(dx,dz));
+  const targetDx=target.x-enemy.group.position.x,targetDz=target.z-enemy.group.position.z;
+  const targetDistance=Math.max(.01,Math.hypot(targetDx,targetDz));
+  const radius=.36*enemy.type.scale*(enemy.elite?1.2:1);
+  getSharedNavigationDirection(enemy,target,navDirection,radius);
+  const directionLength=Math.hypot(navDirection.x,navDirection.z);
   const elapsed=clock.elapsedTime;
   const movementLocked=elapsed<(enemy.stunnedUntil||0)||elapsed<(enemy.rootedUntil||0);
   const abilitySpeed=movementLocked?0:elapsed<(enemy.chargeUntil||0)?2.5:elapsed<(enemy.speedBoostUntil||0)?1.45:1;
-  const desiredSpeed=distance>(crossing ? .2 : stopDistance)?enemy.speed*1.08*abilitySpeed:0;
-  enemy.steering.x=THREE.MathUtils.damp(enemy.steering.x,dx/distance*desiredSpeed,6,delta);
-  enemy.steering.z=THREE.MathUtils.damp(enemy.steering.z,dz/distance*desiredSpeed,6,delta);
-  const radius=.32*enemy.type.scale;
+  const desiredSpeed=targetDistance>stopDistance&&directionLength>.01?enemy.speed*1.08*abilitySpeed:0;
+  enemy.steering.x=THREE.MathUtils.damp(enemy.steering.x,navDirection.x*desiredSpeed,6,delta);
+  enemy.steering.z=THREE.MathUtils.damp(enemy.steering.z,navDirection.z*desiredSpeed,6,delta);
+  const previousX=enemy.group.position.x,previousZ=enemy.group.position.z;
   const nx=enemy.group.position.x+enemy.steering.x*delta;
   const nz=enemy.group.position.z+enemy.steering.z*delta;
-  if(!enemyCollides(nx,enemy.group.position.z,radius))enemy.group.position.x=nx;else enemy.steering.x=0;
-  if(!enemyCollides(enemy.group.position.x,nz,radius))enemy.group.position.z=nz;else enemy.steering.z=0;
-  const yaw=Math.atan2(dx/distance,dz/distance);
+  if(!enemyCollides(nx,enemy.group.position.z,radius))enemy.group.position.x=nx;else{enemy.steering.x=0;enemy.navigationDirectKey=null;clearEnemyNavigationRoute(enemy);}
+  if(!enemyCollides(enemy.group.position.x,nz,radius))enemy.group.position.z=nz;else{enemy.steering.z=0;enemy.navigationDirectKey=null;clearEnemyNavigationRoute(enemy);}
+  syncEnemyMapFloor(enemy);
+  const movedDistance=Math.hypot(enemy.group.position.x-previousX,enemy.group.position.z-previousZ);
+  updateEnemyNavigationProgress(enemy,desiredSpeed>.01,movedDistance,delta);
+  const yaw=directionLength>.01?Math.atan2(navDirection.x,navDirection.z):enemy.group.rotation.y;
   const difference=Math.atan2(Math.sin(yaw-enemy.group.rotation.y),Math.cos(yaw-enemy.group.rotation.y));
   enemy.group.rotation.y+=difference*Math.min(1,delta*10);
   return Math.hypot(enemy.steering.x,enemy.steering.z);
@@ -4334,8 +4743,8 @@ function updateTamedEnemy(enemy, delta, elapsed) {
     enemy.health=enemy.maxHealth*repairProgress;
     if(enemy.typeId===1||enemy.typeId===2||enemy.typeId===3){const stunnedDuration=getEnemyDefinition(enemy.typeId).animations.stunnedDuration||2.2;applyEnemyPose(enemy,{elapsed,stunnedProgress:(elapsed%stunnedDuration)/stunnedDuration});enforceEnemyGraphicsDetail(enemy);}
     enemy.bodyMaterial.emissiveIntensity=.2+Math.sin(elapsed*8)*.08+repairProgress*.18;
-    if(enemy.typeId===1){enemy.group.rotation.z=Math.sin(elapsed*7)*.012;enemy.group.position.y=Math.sin(elapsed*5)*.025;}
-    else if(enemy.typeId!==2&&enemy.typeId!==3){enemy.group.rotation.z=1.15+Math.sin(elapsed*7)*.025;enemy.group.position.y=(enemy.flying?.25:0)+Math.sin(elapsed*5)*.025;}
+    if(enemy.typeId===1){enemy.group.rotation.z=Math.sin(elapsed*7)*.012;enemy.group.position.y=enemy.mapFloorY+Math.sin(elapsed*5)*.025;}
+    else if(enemy.typeId!==2&&enemy.typeId!==3){enemy.group.rotation.z=1.15+Math.sin(elapsed*7)*.025;enemy.group.position.y=enemy.mapFloorY+(enemy.flying?.25:0)+Math.sin(elapsed*5)*.025;}
     keepEnemyAboveArenaFloor(enemy);
     // Update the complete stunned pose before resolving animated anchors and
     // body-surface raycasts, eliminating the previous one-frame beam lag.
@@ -4347,7 +4756,8 @@ function updateTamedEnemy(enemy, delta, elapsed) {
     enemy.health=enemy.maxHealth;
     enemy.tamedRepairStartedAt=null;
     beginCompanionRepairDroneReturn(enemy,elapsed);
-    enemy.group.rotation.z=0; enemy.group.position.y=enemy.flying?1.15:0;
+    enemy.mapFloorY=mapFloorHeight(enemy.group.position.x,enemy.group.position.z);
+    enemy.group.rotation.z=0; enemy.group.position.y=enemy.mapFloorY+(enemy.flying?1.15:0);
     enemy.bodyMaterial.emissive.setHex(0x1677ff); enemy.bodyMaterial.emissiveIntensity=.2;
     playTamedRepairSound(enemy.group);
     speakSquadAlert(`${enemy.type.name} is repaired and back in the fight.`);
@@ -4358,12 +4768,13 @@ function updateTamedEnemy(enemy, delta, elapsed) {
   let movementSpeed=0;
   if(shouldEngage){
     const target=nearest.target;
+    const targetVisible=enemyHasLineOfSight(enemy,nearest.distance,elapsed,target.group.position);
     enemy.abilityTarget=target;
-    if(enemy.pendingStrikeAt&&elapsed>=enemy.pendingStrikeAt){
+    if(enemy.pendingStrikeAt&&elapsed>=enemy.pendingStrikeAt&&targetVisible){
       if(combatTargetDistance(target,enemy.group.position)<3.2)damageCombatTarget(target,enemy.damage*1.25,enemy.typeId===18?"Tamed Shadow Strike":"Tamed Predator Strike",enemy);
       enemy.pendingStrikeAt=0;enemy.attackAnimation=1;
     }
-    if(enemy.burstShots>0&&elapsed>=enemy.burstAt){
+    if(enemy.burstShots>0&&elapsed>=enemy.burstAt&&targetVisible){
       const start=enemy.group.position.clone();start.y+=Math.max(.6,enemy.type.scale);
       const end=target.group.position.clone();end.y+=Math.max(.6,target.type.scale);
       createTracer(start,end,TAMED_ABILITY_COLOR);target.aggroTarget=enemy;target.aggroUntil=elapsed+6;damageEnemy(target,Math.max(4,Math.round(enemy.damage*.55)),"body");
@@ -4380,7 +4791,7 @@ function updateTamedEnemy(enemy, delta, elapsed) {
     const desiredRange=enemy.type.range>5?Math.min(7,enemy.type.range*.65):Math.max(.85,enemy.type.range*.8);
     movementSpeed=moveCompanionToward(enemy,target.group.position,delta,desiredRange);
     const distance=enemy.group.position.distanceTo(target.group.position);
-    if(distance<=desiredRange+1&&elapsed>=enemy.tamedNextAttack&&!(enemy.burstShots>0)){
+    if(distance<=desiredRange+1&&targetVisible&&elapsed>=enemy.tamedNextAttack&&!(enemy.burstShots>0)){
       enemy.attackAnimation=1; playEnemySound(enemy,"attack");
       const allyDamage=Math.max(5,Math.round(enemy.damage*.72));
       if(enemy.type.range>5){
@@ -4503,8 +4914,8 @@ function updateEnemies(delta, elapsed) {
     const hasSight = enemyHasLineOfSight(enemy, distance, elapsed, targetPosition);
     let moveSign = distance > enemy.type.range * (ranged ? .76 : .92) ? 1 : 0;
     if (ranged && !hasSight) moveSign = 1;
-    if (moveSign > 0 && (hasSight || companionTarget)) navDirection.set(dirX, 0, dirZ);
-    else if (moveSign > 0) getWaypointDirection(enemy, navDirection);
+    const radius = .36 * enemy.type.scale * (enemy.elite?1.2:1);
+    if (moveSign > 0) getSharedNavigationDirection(enemy,targetPosition,navDirection,radius,{playerFlow:!companionTarget});
     else navDirection.set(0, 0, 0);
     const movementLocked=elapsed<(enemy.stunnedUntil||0)||elapsed<(enemy.rootedUntil||0);
     const abilitySpeed = movementLocked ? 0 : elapsed < (enemy.chargeUntil || 0) ? 2.5 : elapsed < (enemy.speedBoostUntil || 0) ? 1.45 : 1;
@@ -4512,20 +4923,21 @@ function updateEnemies(delta, elapsed) {
     const stepZ = navDirection.z * enemy.speed * abilitySpeed * moveSign;
     enemy.steering.x = THREE.MathUtils.damp(enemy.steering.x, stepX, 5, delta);
     enemy.steering.z = THREE.MathUtils.damp(enemy.steering.z, stepZ, 5, delta);
-    const radius = .36 * enemy.type.scale;
     const previousX = enemy.group.position.x;
     const previousZ = enemy.group.position.z;
     const nextX = previousX + enemy.steering.x * delta;
     if (!enemyCollides(nextX, enemy.group.position.z, radius)) enemy.group.position.x = nextX;
-    else { enemy.steering.x = 0; enemy.pathVersion = -1; }
+    else { enemy.steering.x = 0; enemy.pathVersion = -1;enemy.navigationDirectKey=null;clearEnemyNavigationRoute(enemy); }
     const nextZ = previousZ + enemy.steering.z * delta;
     if (!enemyCollides(enemy.group.position.x, nextZ, radius)) enemy.group.position.z = nextZ;
-    else { enemy.steering.z = 0; enemy.pathVersion = -1; }
+    else { enemy.steering.z = 0; enemy.pathVersion = -1;enemy.navigationDirectKey=null;clearEnemyNavigationRoute(enemy); }
+    syncEnemyMapFloor(enemy);
 
     const movedX = enemy.group.position.x - previousX;
     const movedZ = enemy.group.position.z - previousZ;
     const movementSpeed = Math.hypot(movedX, movedZ) / Math.max(delta, .001);
-    const targetYaw = Math.atan2(dirX, dirZ);
+    updateEnemyNavigationProgress(enemy,moveSign>0&&abilitySpeed>0,Math.hypot(movedX,movedZ),delta);
+    const targetYaw = movementSpeed>.01?Math.atan2(movedX,movedZ):Math.atan2(dirX,dirZ);
     const yawDifference = Math.atan2(Math.sin(targetYaw - enemy.group.rotation.y), Math.cos(targetYaw - enemy.group.rotation.y));
     enemy.group.rotation.y += yawDifference * Math.min(1, delta * (style === "assassin" ? 14 : 9));
     if (distance <= enemy.type.range && hasSight && elapsed >= enemy.nextAttack && !(enemy.burstShots > 0)) {
@@ -4585,15 +4997,38 @@ function removeProjectile(index) {
   enemyProjectiles.splice(index, 1);
 }
 
+function segmentIntersectsProjectileObstacle(from,to,box,radius=.08){
+  const bounds=[
+    [from.x,to.x,box.minX-radius,box.maxX+radius],
+    [from.y,to.y,(Number.isFinite(box.minY)?box.minY:0)-radius,(Number.isFinite(box.maxY)?box.maxY:box.height)+radius],
+    [from.z,to.z,box.minZ-radius,box.maxZ+radius],
+  ];
+  let enter=0,exit=1;
+  for(const [start,end,min,max] of bounds){
+    const delta=end-start;
+    if(Math.abs(delta)<1e-7){if(start<min||start>max)return false;continue;}
+    const near=(min-start)/delta,far=(max-start)/delta;
+    enter=Math.max(enter,Math.min(near,far));exit=Math.min(exit,Math.max(near,far));
+    if(enter>exit)return false;
+  }
+  return true;
+}
+
+function projectileHitsEnvironment(from,to){
+  if(!insidePlayableArea(to.x,to.z))return true;
+  return obstacles.some((box)=>segmentIntersectsProjectileObstacle(from,to,box));
+}
+
 function updateProjectiles(delta) {
   for (let i = enemyProjectiles.length - 1; i >= 0; i -= 1) {
     const projectile = enemyProjectiles[i];
     projectile.life -= delta;
     if (projectile.homing) {
-      const desired = new THREE.Vector3(camera.position.x, PLAYER.eyeHeight * .75, camera.position.z)
+      const desired = new THREE.Vector3(camera.position.x, camera.position.y-PLAYER.eyeHeight*.25, camera.position.z)
         .sub(projectile.mesh.position).normalize();
       projectile.direction.lerp(desired, Math.min(1, delta * 1.2)).normalize();
     }
+    projectile.previousPosition.copy(projectile.mesh.position);
     projectile.mesh.position.addScaledVector(projectile.direction, projectile.speed * delta);
     const dx = projectile.mesh.position.x - camera.position.x;
     const dy = projectile.mesh.position.y - camera.position.y;
@@ -4601,7 +5036,7 @@ function updateProjectiles(delta) {
     if (dx * dx + dy * dy + dz * dz < .5) {
       damagePlayer(projectile.damage, "Projectile");
       removeProjectile(i);
-    } else if (projectile.life <= 0 || enemyCollides(projectile.mesh.position.x, projectile.mesh.position.z, .08)) {
+    } else if (projectile.life <= 0 || projectileHitsEnvironment(projectile.previousPosition,projectile.mesh.position)) {
       removeProjectile(i);
     }
   }
@@ -4660,7 +5095,8 @@ function killEnemy(enemy) {
   hideHostileTracking(enemy);
   if (enemy.typeId === 1) {
     enemy.group.visible = true;
-    enemy.group.position.y = Math.max(0, enemy.group.position.y);
+    enemy.mapFloorY=mapFloorHeight(enemy.group.position.x,enemy.group.position.z);
+    enemy.group.position.y = Math.max(enemy.mapFloorY, enemy.group.position.y);
     enemy.group.rotation.x = 0;
     enemy.group.rotation.z = 0;
     enemy.burrowState = null;
@@ -4736,7 +5172,7 @@ function finishGame(won) {
   submitRunScore();
   if(!won){
     firingHeld=false;keys.clear();reloading=false;reloadHand.visible=false;
-    deathAnimationActive=true;deathAnimationStartedAt=performance.now();deathStartY=camera.position.y;deathStartRotation.copy(camera.rotation);
+    deathAnimationActive=true;deathAnimationStartedAt=performance.now();deathStartY=camera.position.y;deathFloorY=mapFloorHeight(camera.position.x,camera.position.z);deathStartRotation.copy(camera.rotation);
     damageFlashEl.classList.remove("hit","shield-hit");damageFlashEl.classList.add("fatal-hit");
     playPlayerDeathSound();
   }
@@ -4804,7 +5240,7 @@ function updatePlayerDeathAnimation(){
   const progress=THREE.MathUtils.clamp((performance.now()-deathAnimationStartedAt)/1500,0,1);
   const fall=1-Math.pow(1-progress,3);
   const impact=Math.sin(Math.min(1,progress/.72)*Math.PI)*.025;
-  camera.position.y=THREE.MathUtils.lerp(deathStartY,.46,fall)-impact;
+  camera.position.y=THREE.MathUtils.lerp(deathStartY,deathFloorY+.46,fall)-impact;
   camera.rotation.x=THREE.MathUtils.lerp(deathStartRotation.x,.32,fall);
   camera.rotation.y=deathStartRotation.y;
   camera.rotation.z=THREE.MathUtils.lerp(deathStartRotation.z,1.02,fall);
@@ -4817,11 +5253,15 @@ function updatePlayerDeathAnimation(){
 
 function collides(x, z) {
   if (!insidePlayableArea(x,z,PLAYER.radius)) return true;
-  return obstacles.some((box) =>
-    camera.position.y - PLAYER.eyeHeight < box.height &&
+  const feetY=camera.position.y-PLAYER.eyeHeight+.04;
+  const headY=camera.position.y-.04;
+  return obstacles.some((box) => {
+    const minY=Number.isFinite(box.minY)?box.minY:Number.NEGATIVE_INFINITY;
+    const maxY=Number.isFinite(box.maxY)?box.maxY:box.height;
+    return headY>minY&&feetY<maxY&&
     x + PLAYER.radius > box.minX && x - PLAYER.radius < box.maxX &&
     z + PLAYER.radius > box.minZ && z - PLAYER.radius < box.maxZ
-  );
+  });
 }
 
 function movePlayer(delta) {
@@ -4860,8 +5300,9 @@ function movePlayer(delta) {
 
   velocity.y -= 20 * delta;
   camera.position.y += velocity.y * delta;
-  if (camera.position.y <= PLAYER.eyeHeight) {
-    camera.position.y = PLAYER.eyeHeight;
+  const localEyeHeight=mapFloorHeight(camera.position.x,camera.position.z)+PLAYER.eyeHeight;
+  if (camera.position.y <= localEyeHeight) {
+    camera.position.y = localEyeHeight;
     velocity.y = 0;
     canJump = true;
   }
@@ -4976,9 +5417,9 @@ function setNoClipMode(enabled){
   noClipMode=Boolean(enabled);
   velocity.y=0;canJump=true;
   if(!noClipMode){
-    const overlapsObstacle=obstacles.some((box)=>camera.position.x+PLAYER.radius>box.minX&&camera.position.x-PLAYER.radius<box.maxX&&camera.position.z+PLAYER.radius>box.minZ&&camera.position.z-PLAYER.radius<box.maxZ);
+    const overlapsObstacle=collides(camera.position.x,camera.position.z);
     if(!insidePlayableArea(camera.position.x,camera.position.z,PLAYER.radius)||overlapsObstacle)camera.position.set(0,PLAYER.eyeHeight,18);
-    else camera.position.y=Math.max(PLAYER.eyeHeight,camera.position.y);
+    else camera.position.y=Math.max(mapFloorHeight(camera.position.x,camera.position.z)+PLAYER.eyeHeight,camera.position.y);
   }
   updateTestingToggle(noClipButtonEl,noClipStateEl,noClipMode);
   updateTestingIndicator();
@@ -5019,7 +5460,8 @@ function setTamedGodMode(enabled){
   if(tamedGodMode){
     tamedEnemies.forEach((enemy)=>{
       enemy.health=enemy.maxHealth;enemy.tamedStunnedUntil=0;enemy.tamedRepairStartedAt=null;
-      enemy.group.rotation.z=0;enemy.group.position.y=0;enemy.steering.set(0,0,0);
+      enemy.mapFloorY=mapFloorHeight(enemy.group.position.x,enemy.group.position.z);
+      enemy.group.rotation.z=0;enemy.group.position.y=enemy.mapFloorY;enemy.steering.set(0,0,0);
       removeCompanionRepairDrones(enemy);
       applyEnemyPose(enemy,{elapsed:clock.elapsedTime});
       enforceEnemyGraphicsDetail(enemy);
@@ -5590,6 +6032,7 @@ function animate() {
   } else {updateOnlyEnemyDeaths(delta);updateNanoCells(delta,elapsed);}
   flushPlayerDamageFeedback();
   updateSpawnGates(delta,elapsed);
+  updateCitadelMap(delta,elapsed);
   updateTamingMachines(delta,elapsed);
   updateCarryTutorial(elapsed);
   updateWeapon(delta, elapsed);

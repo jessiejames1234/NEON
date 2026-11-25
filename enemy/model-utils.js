@@ -14,6 +14,7 @@ let modelAnisotropy=1;
 const armorTextures=new Map();
 const segmentDirection=new THREE.Vector3(),segmentMidpoint=new THREE.Vector3(),segmentUp=new THREE.Vector3(0,1,0);
 export const crawlerAnimatedHip=new THREE.Vector3(),crawlerAnimatedKnee=new THREE.Vector3(),crawlerAnimatedAnkle=new THREE.Vector3();
+const crawlerBraceStart=new THREE.Vector3(),crawlerBraceEnd=new THREE.Vector3();
 
 export function setEnemyModelAnisotropy(value){
   modelAnisotropy=Math.max(1,Number(value)||1);
@@ -29,6 +30,28 @@ export function alignCrawlerSegment(mesh,start,end,radius){
   segmentMidpoint.addVectors(start,end).multiplyScalar(.5);
   mesh.position.copy(segmentMidpoint);mesh.scale.set(radius,length,radius);
   mesh.quaternion.setFromUnitVectors(segmentUp,segmentDirection.multiplyScalar(1/length));
+}
+
+export function placeCrawlerLegAccessories(leg,hip,knee,ankle){
+  const {side,rowIndex=1,brace,kneeArmor,ankleArmor,toes=[]}=leg;
+  if(brace){
+    const offset=(rowIndex-1)*.045;
+    crawlerBraceStart.copy(hip);crawlerBraceStart.y+=.055;crawlerBraceStart.z+=offset;
+    crawlerBraceEnd.copy(knee);crawlerBraceEnd.y+=.045;crawlerBraceEnd.z+=offset;
+    alignCrawlerSegment(brace,crawlerBraceStart,crawlerBraceEnd,.026);
+  }
+  if(kneeArmor){
+    kneeArmor.position.copy(knee);kneeArmor.position.x+=side*.018;kneeArmor.position.y+=.018;
+    kneeArmor.rotation.copy(kneeArmor.userData.baseRotation);kneeArmor.rotation.z+=side*.14;
+  }
+  if(ankleArmor){
+    ankleArmor.position.copy(ankle);ankleArmor.position.x+=side*.055;ankleArmor.position.y+=.015;ankleArmor.position.z+=.035;
+    ankleArmor.rotation.copy(ankleArmor.userData.baseRotation);ankleArmor.rotation.y+=side*(rowIndex-1)*.09;
+  }
+  toes.forEach((toe,index)=>{
+    toe.position.copy(ankle);toe.position.x+=side*(.075+index*.075);toe.position.y-=.005;toe.position.z+=.19-index*.025;
+    toe.rotation.copy(toe.userData.baseRotation);toe.rotation.z+=side*(rowIndex-1)*.08;
+  });
 }
 
 function armorTexture(definition){

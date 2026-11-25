@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {alignCrawlerSegment,crawlerAnimatedHip,crawlerAnimatedKnee,crawlerAnimatedAnkle} from "./model-utils.js";
+import {alignCrawlerSegment,placeCrawlerLegAccessories,crawlerAnimatedHip,crawlerAnimatedKnee,crawlerAnimatedAnkle} from "./model-utils.js";
 
 let enemyEffectQuality=1;
 export function setEnemyEffectQuality(value){enemyEffectQuality=THREE.MathUtils.clamp(Number(value)||0,.1,1);}
@@ -77,14 +77,15 @@ function animateCrawler(actor,elapsed,movementAmount,walkPhase,attackStrength){
     crawlerAnimatedHip.y-=weight*.009;crawlerAnimatedHip.z+=stepOffset*.08;
     crawlerAnimatedKnee.x+=side*(lift*.035+strike*.028);crawlerAnimatedKnee.y+=lift*.065-weight*.012;crawlerAnimatedKnee.z+=stepOffset*.48;
     crawlerAnimatedAnkle.y+=lift*.12;crawlerAnimatedAnkle.z+=stepOffset;
-    alignCrawlerSegment(upper,crawlerAnimatedHip,crawlerAnimatedKnee,.055);alignCrawlerSegment(lower,crawlerAnimatedKnee,crawlerAnimatedAnkle,.048);joint.position.copy(crawlerAnimatedKnee);joint.rotation.copy(joint.userData.baseRotation);
+    alignCrawlerSegment(upper,crawlerAnimatedHip,crawlerAnimatedKnee,.075);alignCrawlerSegment(lower,crawlerAnimatedKnee,crawlerAnimatedAnkle,.065);joint.position.copy(crawlerAnimatedKnee);joint.rotation.copy(joint.userData.baseRotation);
     foot.position.set(crawlerAnimatedAnkle.x+side*.055,crawlerAnimatedAnkle.y-.012,crawlerAnimatedAnkle.z+.035);foot.rotation.copy(foot.userData.baseRotation);foot.rotation.x-=lift*.22;foot.rotation.z+=side*(inSwing?Math.sin(swingProgress*Math.PI)*.055:0);
+    placeCrawlerLegAccessories(leg,crawlerAnimatedHip,crawlerAnimatedKnee,crawlerAnimatedAnkle);
   });
   actor.parts.jaws.forEach((part,index)=>{const side=part.userData.crawlerSide||1,mechanicalPulse=Math.sin(elapsed*18+index)*strike*.025;part.position.copy(part.userData.basePosition);part.rotation.copy(part.userData.baseRotation);part.rotation.y+=side*(strike*.43+mechanicalPulse);part.position.z+=strike*.115;part.position.y-=strike*.018;});
   actor.parts.crawlerDrills.forEach((tooth)=>{const angle=tooth.userData.drillPhase+elapsed*(1.4+strike*25),radius=tooth.userData.drillRadius||.072,side=tooth.userData.crawlerSide||1,open=strike*.055;tooth.position.set(tooth.userData.drillCenterX+side*open+Math.cos(angle)*radius,tooth.userData.drillCenterY+Math.sin(angle)*radius,tooth.userData.basePosition.z+strike*.115);tooth.rotation.copy(tooth.userData.baseRotation);tooth.rotation.z=angle;});
   actor.parts.crawlerFeelers.forEach((part)=>{const side=part.userData.crawlerSide||1;part.position.copy(part.userData.basePosition);part.rotation.copy(part.userData.baseRotation);part.rotation.x+=Math.sin(elapsed*2.7+(actor.seed||0)+side)*(.055+idleBlend*.035);part.rotation.z+=side*(Math.sin(elapsed*1.8+(actor.seed||0))*.04-strike*.13);part.position.z+=strike*.12;});
   actor.parts.crawlerPistons.forEach((part,index)=>{const compression=Math.sin(walkPhase+index*Math.PI)*movementAmount;part.position.copy(part.userData.basePosition);part.rotation.copy(part.userData.baseRotation);part.scale.copy(part.userData.baseScale);part.scale.y*=1+compression*.12;part.position.y-=compression*.018;});
-  actor.parts.crawlerArmor.forEach((plate,index)=>{plate.position.copy(plate.userData.basePosition);plate.rotation.copy(plate.userData.baseRotation);plate.position.y+=Math.abs(stride)*(.008+index*.0015)+Math.sin(elapsed*1.9+index)*idleBlend*.0025;plate.rotation.z+=Math.sin(walkPhase+index*1.4)*movementAmount*.009;plate.position.z+=strike*(index<4?.07:.028);});
+  actor.parts.crawlerArmor.forEach((plate,index)=>{plate.position.copy(plate.userData.basePosition);plate.rotation.copy(plate.userData.baseRotation);plate.position.y+=Math.abs(stride)*(.008+index*.0015)+Math.sin(elapsed*1.9+index)*idleBlend*.0025;plate.rotation.z+=Math.sin(walkPhase+index*1.4)*movementAmount*.009;plate.position.z+=strike*(index<3?.07:.028);});
   actor.parts.glows.forEach((part,index)=>part.scale.copy(part.userData.baseScale).multiplyScalar(1+Math.sin(elapsed*4.2+(actor.seed||0)+index)*.045+strike*.16));
   if(actor.parts.body){actor.parts.body.position.copy(actor.parts.body.userData.basePosition);actor.parts.body.rotation.copy(actor.parts.body.userData.baseRotation);actor.parts.body.position.y+=Math.abs(stride)*.024+Math.sin(elapsed*1.8)*idleBlend*.005;actor.parts.body.position.z+=strike*.12;actor.parts.body.rotation.z+=Math.sin(walkPhase)*movementAmount*.018;actor.parts.body.rotation.x-=strike*.075;}
   if(actor.parts.head){actor.parts.head.position.copy(actor.parts.head.userData.basePosition);actor.parts.head.rotation.copy(actor.parts.head.userData.baseRotation);actor.parts.head.position.z+=strike*.2;actor.parts.head.position.y-=strike*.035;actor.parts.head.rotation.x-=strike*.17;actor.parts.head.rotation.y+=Math.sin(elapsed*.85+(actor.seed||0))*idleBlend*.035;}
@@ -163,7 +164,7 @@ function animatePatrolBot(actor,elapsed,movementAmount,walkPhase,attackStrength)
   actor.parts.weapons.forEach(resetPart);actor.parts.glows.forEach(resetPart);
   rig.muzzle.visible=false;
 
-  const baseY=actor.deathBaseY??actor.animationBaseY??0;
+  const baseY=actor.animationBaseY??0;
   actor.group.position.y=baseY+plant*move*.022;
   actor.group.rotation.x=-move*.025+attack*.035;
   actor.group.rotation.z=step*move*.018;
@@ -222,7 +223,7 @@ function animateRustGuard(actor,elapsed,movementAmount,walkPhase,attackStrength)
   actor.parts.legs.forEach(resetPart);actor.parts.arms.forEach(resetPart);
   actor.parts.weapons.forEach(resetPart);actor.parts.glows.forEach(resetPart);
 
-  const baseY=actor.deathBaseY??actor.animationBaseY??0;
+  const baseY=actor.animationBaseY??0;
   actor.group.position.y=baseY+impact*move*.018;
   actor.group.rotation.x=-move*.045-attack*.075;
   actor.group.rotation.z=step*move*.025;
@@ -355,7 +356,7 @@ function animateShockSpider(actor,elapsed,movementAmount,walkPhase,attackStrengt
   rig.mandibles.forEach(resetPart);actor.parts.glows.forEach(resetPart);
   rig.legSets.forEach(({hip,knee,foot})=>{resetPart(hip);resetPart(knee);resetPart(foot);});
 
-  const baseY=actor.deathBaseY??actor.animationBaseY??0;
+  const baseY=actor.animationBaseY??0;
   const scuttle=Math.sin(gait*2),bodyLift=Math.abs(scuttle)*move;
   actor.group.position.y=baseY+bodyLift*.024;
   actor.group.rotation.x=-attack*.08+Math.abs(Math.sin(gait))*move*.012;
@@ -419,7 +420,7 @@ function animateRiotUnit(actor,elapsed,movementAmount,walkPhase,attackStrength){
   actor.parts.legs.forEach(resetPart);actor.parts.arms.forEach(resetPart);
   actor.parts.weapons.forEach(resetPart);actor.parts.glows.forEach(resetPart);
 
-  const baseY=actor.deathBaseY??actor.animationBaseY??0;
+  const baseY=actor.animationBaseY??0;
   actor.group.position.y=baseY+plant*move*.018;
   actor.group.rotation.x=-move*.035-attack*.085;
   actor.group.rotation.z=step*move*.018-impact*.012;
@@ -466,6 +467,44 @@ function animateRiotUnit(actor,elapsed,movementAmount,walkPhase,attackStrength){
   rig.batonTip.rotation.y+=elapsed*(3+attack*15);rig.batonTip.scale.multiplyScalar(1+power*.08+attack*.35+spark*.28);
   rig.emergencyLeft.visible=Math.sin(elapsed*7.5)>-.15;
   rig.emergencyRight.visible=Math.sin(elapsed*7.5+Math.PI)>-.15;
+}
+
+function animateTitanGuardian(actor,elapsed,movementAmount,walkPhase,attackStrength){
+  const rig=actor.parts.titanGuardian;if(!rig)return;
+  const previousElapsed=actor.titanPoseElapsed;
+  const poseDelta=previousElapsed===undefined||elapsed<previousElapsed?1/60:THREE.MathUtils.clamp(elapsed-previousElapsed,1/240,.1);
+  actor.titanPoseElapsed=elapsed;actor.titanMovementBlend=THREE.MathUtils.damp(actor.titanMovementBlend??0,movementAmount,5.5,poseDelta);
+  const move=actor.titanMovementBlend,attack=THREE.MathUtils.smootherstep(THREE.MathUtils.clamp(attackStrength,0,1),.03,.86);
+  const gait=walkPhase*.42,step=Math.sin(gait),plant=Math.abs(Math.sin(gait)),recoil=Math.sin(attack*Math.PI),seed=actor.seed||0;
+  resetPart(actor.parts.body);resetPart(actor.parts.head);actor.parts.arms.forEach(resetPart);actor.parts.legs.forEach(resetPart);
+  actor.parts.weapons.forEach(resetPart);actor.parts.rings.forEach(resetPart);actor.parts.glows.forEach(resetPart);rig.pistons.forEach(resetPart);
+  actor.parts.glows.forEach((part)=>{part.visible=true;});
+  const baseY=actor.animationBaseY??0;
+  actor.group.position.y=baseY+plant*move*.025-attack*.025;
+  actor.group.rotation.x=-move*.025-attack*.055;actor.group.rotation.z=step*move*.012;
+  actor.parts.body.position.y+=plant*move*.035-attack*.025;actor.parts.body.rotation.y+=step*move*.018;actor.parts.body.rotation.x-=attack*.045;
+  actor.parts.head.rotation.y+=Math.sin(elapsed*.42+seed)*(1-move)*.16-step*move*.025;
+  actor.parts.head.rotation.x+=Math.sin(elapsed*.75+seed)*.015-attack*.04;actor.parts.head.position.z+=attack*.05;
+  rig.legs.forEach((leg)=>{
+    const tripodPhase=((leg.side>0?1:0)+(leg.row>0?1:0))%2?Math.PI:0;
+    const swing=Math.sin(gait+tripodPhase),lift=Math.max(0,swing)*move;
+    leg.group.rotation.x+=swing*move*.24+leg.row*move*.025-attack*.04;leg.group.rotation.z-=leg.side*(.055+lift*.04);
+    leg.group.position.y+=lift*.055-plant*move*.012;leg.group.position.z+=swing*move*.05;
+    leg.piston.scale.y*=1-lift*.1+plant*move*.035;
+  });
+  rig.arms.forEach((arm,index)=>{
+    const counter=Math.sin(gait+(index?0:Math.PI))*move;
+    arm.group.rotation.x+=counter*.12-attack*(.18+recoil*.08);
+    arm.group.rotation.z-=arm.side*(.05+attack*.12);arm.group.position.z+=attack*(.1+recoil*.08);
+    arm.cannon.position.z-=recoil*.19;arm.muzzle.scale.multiplyScalar(1+attack*.18+recoil*.35);
+  });
+  const corePulse=.5+.5*Math.sin(elapsed*2.8+seed),powerSurge=Math.max(0,Math.sin(elapsed*18))*attack;
+  rig.coreRing.rotation.z+=elapsed*(.7+attack*3.5);rig.core.rotation.y-=elapsed*(1.2+attack*5);
+  rig.core.scale.multiplyScalar(1+corePulse*.06+attack*.2+powerSurge*.12);
+  rig.halo.rotation.z-=elapsed*(.45+attack*2.2);rig.halo.scale.multiplyScalar(1+corePulse*.035+attack*.12);
+  rig.visor.scale.x*=1+attack*.12;
+  rig.shoulderRings.forEach((ring,index)=>{ring.rotation.z+=elapsed*(index?-.75:.75);ring.scale.multiplyScalar(1+attack*.1);});
+  actor.parts.rings.forEach((ring,index)=>{ring.rotation.y+=elapsed*(index?-.4:.4);ring.scale.multiplyScalar(1+plant*move*.018+attack*.08);});
 }
 
 function animateShockSpiderDeath(actor,time){
@@ -530,7 +569,7 @@ function animateGlowRat(actor,elapsed,movementAmount,walkPhase,attackStrength){
   resetPart(rig.nose);resetPart(rig.mouth);
   actor.parts.glows.forEach(resetPart);
 
-  const baseY=actor.deathBaseY??actor.animationBaseY??0;
+  const baseY=actor.animationBaseY??0;
   actor.group.position.y=baseY+Math.abs(doubleStep)*move*.018;
   actor.group.rotation.x=-attack*.105+Math.abs(step)*move*.018;
   actor.group.rotation.z=doubleStep*move*.018+biteRattle*.006;
@@ -620,7 +659,7 @@ function animateGlowRatStunned(actor,elapsed,stunP){
   const seizure=Math.sin(stunP*Math.PI*14+seed*3.1)*settle;
   const tremor=Math.sin(stunP*Math.PI*34+seed*5.7)*settle;
   const powerPulse=.5+.5*Math.sin(stunP*Math.PI*10+seed);
-  const baseY=actor.deathBaseY??actor.animationBaseY??0;
+  const baseY=actor.animationBaseY??0;
 
   // Keep E03 upright and facing forward while disabled. Its body crouches
   // directly downward instead of rolling onto either side.
@@ -903,11 +942,12 @@ export function applyEnemyPose(actor,{elapsed=0,movementAmount=0,walkPhase=elaps
   else if(actor.typeId===6||actor.id===6)animatePulseDrone(actor,elapsed,movementAmount,walkPhase,attackStrength);
   else if(actor.typeId===7||actor.id===7)animateShockSpider(actor,elapsed,movementAmount,walkPhase,attackStrength);
   else if(actor.typeId===8||actor.id===8)animateRiotUnit(actor,elapsed,movementAmount,walkPhase,attackStrength);
+  else if(actor.typeId===19||actor.id===19)animateTitanGuardian(actor,elapsed,movementAmount,walkPhase,attackStrength);
   else{
     // Start every generic pose from a stable root transform. Stunned used to
     // add rotation and subtract height every frame, eventually sinking units.
     actor.group.rotation.z=0;
-    if(!actor.flying)actor.group.position.y=actor.deathBaseY??actor.animationBaseY??0;
+    if(!actor.flying)actor.group.position.y=actor.animationBaseY??0;
     actor.parts.legs.forEach((part,index)=>{resetPart(part);if([1,3,7,17].includes(actor.typeId||actor.id))part.rotation.z+=stride*(index%2?.12:-.12);else part.rotation.x+=stride*(index%2?.18:-.18);});
     actor.parts.arms.forEach((part,index)=>{resetPart(part);part.rotation.x+=stride*(index%2?-.12:.12)-attackStrength*.5;});
     actor.parts.rotors.forEach((part,index)=>{resetPart(part);part.rotation.y+=elapsed*(index%2?-13:13);});
@@ -956,7 +996,7 @@ export function applyEnemyPose(actor,{elapsed=0,movementAmount=0,walkPhase=elaps
     }else if(actor.typeId===7||actor.id===7){
       const rig=actor.parts.shockSpider,twitch=Math.sin(stunP*Math.PI*28+(actor.seed||0)),fault=.5+.5*Math.sin(stunP*Math.PI*12);
       actor.group.rotation.z=twitch*.025;actor.group.rotation.x=.04+fault*.015;
-      actor.group.position.y=(actor.deathBaseY??actor.animationBaseY??0)-arc*.09;
+      actor.group.position.y=(actor.animationBaseY??0)-arc*.09;
       if(actor.parts.body){actor.parts.body.position.y-=arc*.13;actor.parts.body.scale.y*=1-arc*.13;actor.parts.body.rotation.z+=twitch*.02;}
       if(actor.parts.head){actor.parts.head.position.y-=arc*.11;actor.parts.head.rotation.x+=arc*.16+twitch*.035;}
       rig?.legSets.forEach(({side,row,hip,knee,foot},index)=>{
@@ -965,10 +1005,18 @@ export function applyEnemyPose(actor,{elapsed=0,movementAmount=0,walkPhase=elaps
       });
       rig?.mandibles.forEach((mandible,index)=>{const side=mandible.userData.shockSpiderSide||1;mandible.rotation.y-=side*(arc*.18+twitch*.055*(index?1:-1));});
       actor.parts.glows.forEach((part,index)=>{part.visible=Math.sin(stunP*Math.PI*(18+index*.08)+index)>-.35;part.scale.multiplyScalar(.8+fault*.35);});
+    }else if(actor.typeId===19||actor.id===19){
+      const rig=actor.parts.titanGuardian,tremor=Math.sin(stunP*Math.PI*18),power=.5+.5*Math.sin(stunP*Math.PI*10);
+      actor.group.position.y=(actor.animationBaseY??0)-arc*.12;actor.group.rotation.x=arc*.11+tremor*.012;actor.group.rotation.z=tremor*.018;
+      actor.parts.body.position.y-=arc*.1;actor.parts.body.rotation.x+=arc*.12;
+      actor.parts.head.position.y-=arc*.08;actor.parts.head.rotation.x+=arc*.18+tremor*.025;
+      rig?.arms.forEach((arm)=>{arm.group.rotation.x+=arc*.48+tremor*.035;arm.group.rotation.z+=arm.side*arc*.15;});
+      rig?.legs.forEach((leg)=>{leg.group.rotation.x-=arc*.13;leg.group.rotation.z-=leg.side*arc*.12;leg.group.position.y-=arc*.06;});
+      if(rig){rig.core.visible=Math.sin(stunP*Math.PI*24)>-.35;rig.core.scale.multiplyScalar(.72+power*.34);rig.visor.visible=Math.sin(stunP*Math.PI*17)>.05;rig.halo.rotation.z+=tremor*.12;}
     }else{
       actor.group.rotation.z=arc*1.05;
       if(actor.flying)actor.group.position.y-=arc*.08;
-      else actor.group.position.y=(actor.deathBaseY??actor.animationBaseY??0)-arc*.08;
+      else actor.group.position.y=(actor.animationBaseY??0)-arc*.08;
     }
   }else if(actor.typeId===3||actor.id===3){
     actor.glowRatStunStartedAt=undefined;
@@ -976,8 +1024,26 @@ export function applyEnemyPose(actor,{elapsed=0,movementAmount=0,walkPhase=elaps
   }
 }
 
+function animateTitanGuardianDeath(actor,time){
+  const rig=actor.parts.titanGuardian,duration=actor.deathDuration||2.4;if(!rig)return time>=duration;
+  const p=THREE.MathUtils.clamp(time/duration,0,1),powerFail=THREE.MathUtils.smootherstep(p,0,.28),kneel=THREE.MathUtils.smootherstep(p,.16,.58),impact=THREE.MathUtils.smootherstep(p,.5,.76),fade=1-THREE.MathUtils.smootherstep(p,.76,1);
+  const tremor=Math.sin(time*24)*(1-impact),floorY=actor.mapFloorY??actor.animationBaseY??0;
+  resetPart(actor.parts.body);resetPart(actor.parts.head);actor.parts.arms.forEach(resetPart);actor.parts.legs.forEach(resetPart);actor.parts.weapons.forEach(resetPart);actor.parts.rings.forEach(resetPart);actor.parts.glows.forEach(resetPart);
+  actor.group.position.y=(actor.deathBaseY??floorY)-kneel*.2-impact*.14;actor.group.rotation.y=actor.deathBaseRotationY||0;
+  actor.group.rotation.x=kneel*.12+impact*.28;actor.group.rotation.z=tremor*.012;
+  actor.parts.body.position.y-=kneel*.13;actor.parts.body.rotation.x+=impact*.18;
+  actor.parts.head.position.y-=kneel*.18+impact*.08;actor.parts.head.rotation.x+=powerFail*.16+impact*.22;
+  rig.legs.forEach((leg)=>{leg.group.rotation.x-=kneel*.42;leg.group.rotation.z-=leg.side*(kneel*.15+impact*.08);leg.group.position.y-=kneel*.12;leg.group.position.z+=impact*.06;});
+  rig.arms.forEach((arm)=>{arm.group.rotation.x+=powerFail*.58+impact*.25;arm.group.rotation.z+=arm.side*(powerFail*.12+impact*.22);arm.group.position.y-=impact*.06;});
+  rig.coreRing.rotation.z+=time*(5-4*p);rig.halo.rotation.z-=time*(4-3*p);
+  const flicker=Math.sin(time*31)>THREE.MathUtils.lerp(-.8,.35,p);rig.core.visible=fade>.01&&flicker;rig.visor.visible=fade>.01&&Math.sin(time*23)>.1;
+  actor.group.traverse((child)=>{if(child.isMesh&&child.material){child.material.transparent=true;child.material.opacity=(child.userData.baseOpacity??1)*fade;}});
+  return p>=1;
+}
+
 export function applyEnemyDeathPose(actor,time){
   const progress=THREE.MathUtils.clamp(time/(actor.deathDuration||1.2),0,1);
+  if(actor.typeId===19||actor.id===19)return animateTitanGuardianDeath(actor,time);
   if(actor.typeId===1||actor.id===1){
     const collapseDuration=actor.deathDuration||2.4,collapseProgress=THREE.MathUtils.clamp(time/collapseDuration,0,1),fadeProgress=THREE.MathUtils.clamp(time-collapseDuration,0,1);
     const collapse=THREE.MathUtils.smootherstep(collapseProgress,0,.78),fallSide=((actor.seed||.5)%1)>.5?1:-1;
@@ -988,8 +1054,9 @@ export function applyEnemyDeathPose(actor,time){
       const outward=Math.abs(leg.ankle.x)+.1+rowIndex*.025,foreAft=(rowIndex-1)*.085;
       crawlerAnimatedKnee.x=THREE.MathUtils.lerp(leg.knee.x,side*(.53+rowIndex*.02),collapse);crawlerAnimatedKnee.y=THREE.MathUtils.lerp(leg.knee.y,.065,collapse);crawlerAnimatedKnee.z+=foreAft*collapse*.45;
       crawlerAnimatedAnkle.x=THREE.MathUtils.lerp(leg.ankle.x,side*outward,collapse);crawlerAnimatedAnkle.y=THREE.MathUtils.lerp(leg.ankle.y,.045,collapse);crawlerAnimatedAnkle.z+=foreAft*collapse;
-      alignCrawlerSegment(upper,crawlerAnimatedHip,crawlerAnimatedKnee,.055);alignCrawlerSegment(lower,crawlerAnimatedKnee,crawlerAnimatedAnkle,.048);joint.position.copy(crawlerAnimatedKnee);
+      alignCrawlerSegment(upper,crawlerAnimatedHip,crawlerAnimatedKnee,.075);alignCrawlerSegment(lower,crawlerAnimatedKnee,crawlerAnimatedAnkle,.065);joint.position.copy(crawlerAnimatedKnee);
       foot.position.set(crawlerAnimatedAnkle.x+side*.055,crawlerAnimatedAnkle.y-.012,crawlerAnimatedAnkle.z+.035);foot.rotation.copy(foot.userData.baseRotation);foot.rotation.y+=side*(rowIndex-1)*collapse*.12;foot.rotation.z+=side*(.2+rowIndex*.08)*collapse;foot.rotation.x+=(rowIndex-1)*collapse*.1;
+      placeCrawlerLegAccessories(leg,crawlerAnimatedHip,crawlerAnimatedKnee,crawlerAnimatedAnkle);
     });
     actor.parts.crawlerArmor.forEach((part,index)=>{resetPart(part);part.position.y-=collapse*(index<3?.1:.075);part.rotation.x+=(index<3?(index-1)*collapse*.025:0);});
     actor.parts.crawlerPistons.forEach((part)=>{resetPart(part);part.position.y-=collapse*.075;part.scale.y*=1-collapse*.22;});
@@ -1016,7 +1083,7 @@ export function applyEnemyDeathPose(actor,time){
     const duration=actor.deathDuration||2.4,p=THREE.MathUtils.clamp(time/duration,0,1),rig=actor.parts.brokenDrone;
     const fail=THREE.MathUtils.smootherstep(p,0,.32),fall=THREE.MathUtils.smootherstep(p,.12,.72),impact=THREE.MathUtils.smootherstep(p,.62,.9),fade=1-THREE.MathUtils.smootherstep(p,.72,1);
     const fallSide=-1,startY=(actor.deathBaseY??0)+(actor.anchor?1.15:0);
-    actor.group.position.y=THREE.MathUtils.lerp(startY,0,fall);
+    actor.group.position.y=THREE.MathUtils.lerp(startY,actor.mapFloorY??actor.animationBaseY??0,fall);
     actor.group.rotation.x=fail*.16-impact*.09;
     actor.group.rotation.z=fallSide*(fail*.08+fall*.14+impact*.08);
     actor.group.rotation.y=(actor.deathBaseRotationY||0)+fallSide*(fail*.7+fall*2.1);
@@ -1050,7 +1117,7 @@ export function applyEnemyDeathPose(actor,time){
   if(actor.typeId===3||actor.id===3)return animateGlowRatDeath(actor,time);
   if(actor.typeId===7||actor.id===7)return animateShockSpiderDeath(actor,time);
   actor.group.rotation.z=Math.min(Math.PI*.52,time*2.25);actor.group.rotation.y=(actor.deathBaseRotationY||0)+time*(actor.flying?5:.7);
-  actor.group.position.y=Math.max(0,(actor.deathBaseY||0)-time*2.3);
+  actor.group.position.y=Math.max(actor.mapFloorY??actor.animationBaseY??0,(actor.deathBaseY||0)-time*2.3);
   if(time>.55){const fade=Math.max(0,1-(time-.55)/.65),shrink=Math.exp(-(time-.55)*2.2);if(actor.baseScale)actor.group.scale.copy(actor.baseScale).multiplyScalar(shrink);actor.group.traverse((child)=>{if(child.isMesh&&child.material){child.material.transparent=true;child.material.opacity=Math.min(child.userData.baseOpacity??child.material.opacity,fade);}});}
   return progress>=1;
 }

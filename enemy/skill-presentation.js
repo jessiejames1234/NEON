@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {alignCrawlerSegment} from "./model-utils.js";
+import {alignCrawlerSegment,placeCrawlerLegAccessories} from "./model-utils.js";
 
 const digHip=new THREE.Vector3(),digKnee=new THREE.Vector3(),digAnkle=new THREE.Vector3();
 let enemySkillEffectQuality=1;
@@ -11,7 +11,7 @@ export function getScrapBurrowGroundPosition(actor,target=new THREE.Vector3()){
   const forwardDistance=Math.max(.5,(actor.group.scale.z||1)*1.08);
   return target.set(
     actor.group.position.x+Math.sin(actor.group.rotation.y)*forwardDistance,
-    .045,
+    (actor.mapFloorY??actor.animationBaseY??0)+.045,
     actor.group.position.z+Math.cos(actor.group.rotation.y)*forwardDistance,
   );
 }
@@ -63,7 +63,7 @@ export function applyScrapDigPose(actor,progress,emerging=false){
   const emergePitch=THREE.MathUtils.lerp(-.72,-.16,emergeBreak)+emergeSettle*.16;
   const pitch=emerging?emergePitch:enterPitch;
   const recoveryBounce=emerging?Math.sin(emergeSettle*Math.PI*2)*(1-emergeSettle)*.065:0;
-  actor.group.position.y=-depth*.78-brace+recoveryBounce;
+  actor.group.position.y=(actor.mapFloorY??actor.animationBaseY??0)-depth*.78-brace+recoveryBounce;
   actor.group.rotation.x=pitch;
   actor.group.rotation.z=chassisShake*.034;
   actor.parts.crawlerLegSets.forEach((leg)=>{
@@ -77,8 +77,9 @@ export function applyScrapDigPose(actor,progress,emerging=false){
     digHip.copy(leg.hip);digKnee.copy(leg.knee);digAnkle.copy(leg.ankle);
     digKnee.x=THREE.MathUtils.lerp(leg.knee.x+side*anchorPulse*.035,side*.47,retract);digKnee.y=THREE.MathUtils.lerp(leg.knee.y-anchorPulse*.025,.155,retract);digKnee.z=THREE.MathUtils.lerp(leg.knee.z+rolePush*anchorPulse*.45,leg.hip.z+frontBias,retract);
     digAnkle.x=THREE.MathUtils.lerp(leg.ankle.x+side*anchorPulse*.055,side*.535,retract);digAnkle.y=THREE.MathUtils.lerp(leg.ankle.y-anchorPulse*.018,.095,retract);digAnkle.z=THREE.MathUtils.lerp(leg.ankle.z+rolePush*anchorPulse,leg.hip.z+frontBias*.45,retract);
-    alignCrawlerSegment(upper,digHip,digKnee,.055);alignCrawlerSegment(lower,digKnee,digAnkle,.048);joint.position.copy(digKnee);joint.rotation.copy(joint.userData.baseRotation);
+    alignCrawlerSegment(upper,digHip,digKnee,.075);alignCrawlerSegment(lower,digKnee,digAnkle,.065);joint.position.copy(digKnee);joint.rotation.copy(joint.userData.baseRotation);
     foot.position.set(digAnkle.x+side*.045,digAnkle.y-.012,digAnkle.z+.025);foot.rotation.copy(foot.userData.baseRotation);foot.rotation.z+=side*retract*.38;foot.rotation.x-=retract*.18;
+    placeCrawlerLegAccessories(leg,digHip,digKnee,digAnkle);
   });
   actor.parts.jaws.forEach((jaw,index)=>{jaw.position.copy(jaw.userData.basePosition);jaw.rotation.copy(jaw.userData.baseRotation);const side=jaw.userData.crawlerSide||1,toolPhase=drillCycle+(index%3-1)*.18;jaw.rotation.y+=side*(fold*.18+toolPhase*drillEnvelope*.105);jaw.rotation.z+=toolPhase*drillEnvelope*.035;jaw.position.z+=fold*.105+Math.abs(toolPhase)*drillEnvelope*.028;jaw.position.y-=fold*.025;});
   actor.parts.crawlerDrills.forEach((tooth)=>{const side=tooth.userData.crawlerSide||1,angle=tooth.userData.drillPhase+p*Math.PI*18,radius=(tooth.userData.drillRadius||.072)+drillEnvelope*.006;tooth.position.set(tooth.userData.drillCenterX+side*fold*.025+Math.cos(angle)*radius,tooth.userData.drillCenterY+Math.sin(angle)*radius,tooth.userData.basePosition.z+fold*.105+Math.abs(drillCycle)*drillEnvelope*.018);tooth.rotation.copy(tooth.userData.baseRotation);tooth.rotation.z=angle;tooth.scale.copy(tooth.userData.baseScale);tooth.scale.y*=1+drillEnvelope*.1;});
@@ -219,7 +220,7 @@ export function applyEnemySkillPose(actor,definition,time,duration,{previewMotio
     resetEnemySkillPose(actor);
     const phase=getScrapBurrowPhase(time);
     if(phase.name==="enter")applyScrapDigPose(actor,phase.progress,false);
-    else if(phase.name==="travel"){actor.group.position.y=-.78;actor.group.rotation.x=.65;if(previewMotion)actor.group.position.z+=THREE.MathUtils.smootherstep(phase.progress,0,1)*8.55;}
+    else if(phase.name==="travel"){actor.group.position.y=(actor.mapFloorY??actor.animationBaseY??0)-.78;actor.group.rotation.x=.65;if(previewMotion)actor.group.position.z+=THREE.MathUtils.smootherstep(phase.progress,0,1)*8.55;}
     else{if(previewMotion)actor.group.position.z+=8.55;applyScrapDigPose(actor,phase.progress,true);}
   }else if(motion==="dash"&&definition.id===8){
     const rig=parts.riotUnit;
@@ -329,6 +330,25 @@ export function applyEnemySkillPose(actor,definition,time,duration,{previewMotio
   }
   else if(motion==="leap"&&previewMotion){actor.group.position.y+=arc*1.45;actor.group.position.z+=THREE.MathUtils.smoothstep(Math.min(1,p/.7),0,1)*8.4;parts.legs.forEach((part,index)=>part.rotation.z+=(index%2?1:-1)*arc*.38);}
   else if(motion==="phase"){if(previewMotion){actor.group.visible=!(p>.32&&p<.55);if(p>=.55)actor.group.position.z+=8.55;actor.group.position.x+=Math.sin(p*Math.PI*2)*.45;}parts.rings.forEach((part,index)=>part.rotation[index%2?"z":"y"]+=time*5);}
+  else if(motion==="stomp"&&definition.id===19){
+    const rig=parts.titanGuardian;
+    const brace=THREE.MathUtils.smootherstep(p,0,.2),lift=Math.sin(THREE.MathUtils.clamp(p/.48,0,1)*Math.PI)*(.4+.6*(1-THREE.MathUtils.smootherstep(p,.42,.52)));
+    const slam=THREE.MathUtils.smootherstep(p,.4,.54),impact=Math.sin(THREE.MathUtils.clamp((p-.5)/.18,0,1)*Math.PI),recovery=THREE.MathUtils.smootherstep(p,.72,1),charge=brace*(1-recovery);
+    if(previewMotion)actor.group.position.y+=lift*.22-impact*.08;
+    actor.group.rotation.x-=brace*.07+slam*.05-impact*.08;
+    if(parts.body){parts.body.position.y-=brace*.07+impact*.1;parts.body.rotation.x-=brace*.09+impact*.16;parts.body.scale.y*=1-brace*.04+impact*.07;}
+    if(parts.head){parts.head.position.y-=brace*.06+impact*.04;parts.head.rotation.x+=brace*.08-impact*.06;}
+    if(rig){
+      const stompLeg=rig.legs.find((leg)=>leg.side>0&&leg.row>0)||rig.legs[0];
+      stompLeg.group.position.y+=lift*.34-impact*.08;stompLeg.group.position.z+=lift*.13+slam*.08;stompLeg.group.rotation.x-=lift*.44+impact*.12;
+      rig.legs.forEach((braceLeg)=>{if(braceLeg===stompLeg)return;braceLeg.group.rotation.x+=brace*.1-impact*.08;braceLeg.group.rotation.z-=braceLeg.side*(brace*.08+impact*.07);braceLeg.group.position.y-=impact*.035;});
+      rig.arms.forEach((arm)=>{arm.group.rotation.x-=brace*.3-impact*.18;arm.group.rotation.z-=arm.side*(brace*.16+impact*.09);arm.group.position.z+=brace*.16;});
+      rig.coreRing.rotation.z+=time*(2+charge*8);rig.core.scale.multiplyScalar(1+charge*.42+impact*.75);rig.coreRing.scale.multiplyScalar(1+charge*.2+impact*.45);
+      rig.halo.rotation.z-=time*(1+charge*5);rig.halo.scale.multiplyScalar(1+charge*.18+impact*.3);rig.visor.scale.x*=1+charge*.16+impact*.18;
+      rig.shoulderRings.forEach((ring,index)=>{ring.rotation.z+=time*(index? -4:4);ring.scale.multiplyScalar(1+charge*.16+impact*.3);});
+    }
+    parts.rings.forEach((ring,index)=>{ring.rotation.y+=time*(index? -3:3);ring.scale.multiplyScalar(1+charge*.12+impact*1.15);});
+  }
   else if(motion==="stomp"){if(previewMotion)actor.group.position.y+=Math.sin(Math.min(1,p*2)*Math.PI)*.45;if(parts.body)parts.body.rotation.x-=arc*.18;parts.rings.forEach((part)=>part.scale.multiplyScalar(1+p*8));}
   else if(motion==="core"){parts.rings.forEach((part,index)=>{part.rotation.x+=time*(1+index);part.rotation.y+=time*(1.4+index);part.scale.multiplyScalar(1+arc*.18);});parts.glows.forEach((part)=>part.scale.multiplyScalar(1+arc*.25));}
   else if(motion==="rangedBurst"&&definition.id===2){

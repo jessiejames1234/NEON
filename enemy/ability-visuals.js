@@ -21,13 +21,14 @@ export function createAbilityVisual(scene,kind,position,options={}){
     color:options.color??0xff496c,transparent:true,opacity:options.opacity??.5,
     depthWrite:false,blending:THREE.AdditiveBlending,
   });
+  const floorY=options.floorY??0;
   let mesh;
   if(burrowVisual){
-    mesh=new THREE.Group();mesh.position.copy(position);mesh.position.y=options.y??.045;
+    mesh=new THREE.Group();mesh.position.copy(position);mesh.position.y=floorY+(options.y??.045);
     const ring=new THREE.Mesh(abilityBurrowRingGeometry,material);ring.rotation.x=-Math.PI/2;ring.userData.burrowRing=true;mesh.add(ring);
     for(let index=0;index<8;index+=1){const angle=index*Math.PI*.25,shard=new THREE.Mesh(abilityBurrowShardGeometry,material);shard.position.set(Math.cos(angle)*.43,.025,Math.sin(angle)*.43);shard.rotation.set(angle*.4,angle,angle*.7);shard.userData.burrowShard={angle,index};mesh.add(shard);}
   }else if(radiationRush){
-    mesh=new THREE.Group();mesh.position.copy(position);mesh.position.y=options.y??.04;
+    mesh=new THREE.Group();mesh.position.copy(position);mesh.position.y=floorY+(options.y??.04);
     const radius=options.radius??4;
     const core=new THREE.Mesh(abilityDiskGeometry,material);core.scale.set(radius*2,1,radius*2);core.userData.radiationCore=true;mesh.add(core);
     for(let index=0;index<3;index+=1){
@@ -40,7 +41,7 @@ export function createAbilityVisual(scene,kind,position,options={}){
     }
   }else{
     const geometry=options.shape==="orb"?abilityOrbGeometry:options.shape==="beam"?abilityBeamGeometry:abilityDiskGeometry;
-    mesh=new THREE.Mesh(geometry,material);mesh.position.copy(position);mesh.position.y=options.shape==="orb"?(options.y??1):(options.y??.045);
+    mesh=new THREE.Mesh(geometry,material);mesh.position.copy(position);mesh.position.y=floorY+(options.shape==="orb"?(options.y??1):(options.y??.045));
   }
   const radius=options.radius??2;
   const visualRadius=options.visualRadius??(options.shape==="orb"?.55:radius);
